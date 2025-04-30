@@ -68,7 +68,9 @@ This section provides an explanation of the JSON input used to configure the bui
 #### 5. Kernel
 **Description:** Specifies the kernel version or type to be used in the OS build..    
 
-
+Run the sample JSON files against the defined [schema](schema/os-image-composer.schema.json).
+There are two sample JSON files, one [valid](/testdata/valid.json) and one with
+[invalid](testdata/invalid.json) content.
 
 ## Getting Help
 
