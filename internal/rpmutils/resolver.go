@@ -3,6 +3,7 @@ package rpmutils
 import (
     "fmt"
     "path/filepath"
+    "go.uber.org/zap"
     "github.com/cavaliergopher/rpm"
 )
 
@@ -14,6 +15,7 @@ type Index struct {
 
 // BuildIndex scans all RPM files under dir and builds the Index.
 func BuildIndex(dir string) (*Index, error) {
+  logger := zap.L().Sugar()
   idx := &Index{
       Provides: make(map[string][]string),
       Requires: make(map[string][]string),
@@ -37,6 +39,7 @@ func BuildIndex(dir string) (*Index, error) {
       for _, dep := range provDeps {
           name := dep.Name() // call method to get string
           idx.Provides[name] = append(idx.Provides[name], rpmPath)
+          // logger.Debugf("RPM %s provides %s", rpmPath, name)
       }
 
       // Extract its Requires()
@@ -44,6 +47,7 @@ func BuildIndex(dir string) (*Index, error) {
       reqNames := make([]string, len(reqDeps))
       for i, dep := range reqDeps {
           reqNames[i] = dep.Name() // call method
+          // logger.Debugf("RPM %s requires %s", rpmPath, reqNames[i])
       }
       idx.Requires[rpmPath] = reqNames
   }
@@ -54,9 +58,11 @@ func BuildIndex(dir string) (*Index, error) {
 // ResolveDependencies returns the full set of RPMs needed
 // starting from the given root paths, walking requires -> provides.
 func ResolveDependencies(roots []string, idx *Index) []string {
+  logger := zap.L().Sugar()
   needed := make(map[string]struct{})
   queue := append([]string{}, roots...)
 
+  logger.Infof("resolving dependencies for %d RPMs", len(roots))
   for len(queue) > 0 {
       cur := queue[0]
       queue = queue[1:]

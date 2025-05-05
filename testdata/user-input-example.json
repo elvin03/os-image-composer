@@ -13,7 +13,8 @@
         "rsyslog",
         "sgx-backwards-compatibility",
         "WALinuxAgent",        
-        "wireless-regdb"        
+        "wireless-regdb",
+        "zstd-devel-1.5.5-2.azl3.x86_64.rpm"     
     ],
     "immutable": false,
     "output": "iso",
