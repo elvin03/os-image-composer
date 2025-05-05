@@ -35,6 +35,12 @@ so the provider name is `azurelinux3`.
 go run ./cmd/image-composer testdata/valid.json
 ```
 
+With Earthfile, simply run:
+
+```bash
+earthly +build
+```
+
 ### User Input Json
 
 This section provides an explanation of the JSON input used to configure the
