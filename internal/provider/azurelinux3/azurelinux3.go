@@ -1,18 +1,18 @@
 package azurelinux3
 
 import (
-    "go.uber.org/zap"
-    "strings"
-    "bufio"
+	"bufio"
 	"fmt"
-	"time"
-	"io"
-	"os"
-	"net/http"
-	"path/filepath"
-    "github.com/intel-innersource/os.linux.tiberos.os-curation-tool/internal/provider"
-	"github.com/intel-innersource/os.linux.tiberos.os-curation-tool/internal/rpmutils"
 	"github.com/intel-innersource/os.linux.tiberos.os-curation-tool/internal/config"
+	"github.com/intel-innersource/os.linux.tiberos.os-curation-tool/internal/provider"
+	"github.com/intel-innersource/os.linux.tiberos.os-curation-tool/internal/rpmutils"
+	"go.uber.org/zap"
+	"io"
+	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
 )
 
 // repoConfig holds .repo file values
@@ -27,13 +27,13 @@ type repoConfig struct {
 }
 
 // AzureLinux3 implements provider.Provider
-type AzureLinux3 struct { 
+type AzureLinux3 struct {
 	repo repoConfig
 	spec *config.BuildSpec
 }
 
 func init() {
-    provider.Register(&AzureLinux3{})
+	provider.Register(&AzureLinux3{})
 }
 
 // Name returns the unique name of the provider
@@ -41,9 +41,9 @@ func (p *AzureLinux3) Name() string { return "AzureLinux3" }
 
 // Init will initialize the provider, fetching repo configuration
 func (p *AzureLinux3) Init(spec *config.BuildSpec) error {
-    
-    logger := zap.L().Sugar()
-    configURL := "https://packages.microsoft.com/azurelinux/3.0/prod/base/x86_64/config.repo"
+
+	logger := zap.L().Sugar()
+	configURL := "https://packages.microsoft.com/azurelinux/3.0/prod/base/x86_64/config.repo"
 	resp, err := http.Get(configURL)
 	if err != nil {
 		logger.Errorf("downloading repo config %s failed: %v", configURL, err)
@@ -58,17 +58,17 @@ func (p *AzureLinux3) Init(spec *config.BuildSpec) error {
 	}
 	p.repo = cfg
 	logger.Infof("Initialized AzureLinux3 provider repo section=%s", p.repo.Section)
-    logger.Infof("name=%s", p.repo.Name)
-    logger.Infof("baseurl=%s", p.repo.BaseURL)
+	logger.Infof("name=%s", p.repo.Name)
+	logger.Infof("baseurl=%s", p.repo.BaseURL)
 
 	p.spec = spec
 	return nil
 }
 func (p *AzureLinux3) Packages() ([]provider.PackageInfo, error) {
-    // get sugar logger from zap
+	// get sugar logger from zap
 	logger := zap.L().Sugar()
-    logger.Infof("fetching packages from %s", p.repo.BaseURL)
-    var pkgs []provider.PackageInfo
+	logger.Infof("fetching packages from %s", p.repo.BaseURL)
+	var pkgs []provider.PackageInfo
 
 	// directories are under BaseURL/Packages/A, BaseURL/Packages/B, ...
 	for c := 'a'; c <= 'z'; c++ {
@@ -78,64 +78,64 @@ func (p *AzureLinux3) Packages() ([]provider.PackageInfo, error) {
 			continue // skip missing or empty dirs
 		}
 	}
-    logger.Infof("found %d packages in AzureLinux3 repo", len(pkgs))
+	logger.Infof("found %d packages in AzureLinux3 repo", len(pkgs))
 	return pkgs, nil
 }
 func (p *AzureLinux3) Validate(destDir string) error {
-    // get sugar logger from zap
+	// get sugar logger from zap
 	logger := zap.L().Sugar()
 
 	// read the GPG key from the repo config
 	resp, err := http.Get(p.repo.GPGKey)
-    if err != nil {
-        return fmt.Errorf("fetch GPG key %s: %w", p.repo.GPGKey, err)
-    }
-    defer resp.Body.Close()
+	if err != nil {
+		return fmt.Errorf("fetch GPG key %s: %w", p.repo.GPGKey, err)
+	}
+	defer resp.Body.Close()
 
-    keyBytes, err := io.ReadAll(resp.Body)
-    if err != nil {
-        return fmt.Errorf("read GPG key body: %w", err)
+	keyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("read GPG key body: %w", err)
 	}
 	logger.Infof("fetched GPG key \n%s", keyBytes)
 
 	// store in a temp file
 	tmp, err := os.CreateTemp("", "azurelinux-gpg-*.asc")
-    if err != nil {
-        return fmt.Errorf("create temp key file: %w", err)
-    }
-    defer func() {
-        tmp.Close()
-        os.Remove(tmp.Name())
-    }()
+	if err != nil {
+		return fmt.Errorf("create temp key file: %w", err)
+	}
+	defer func() {
+		tmp.Close()
+		os.Remove(tmp.Name())
+	}()
 
-    if _, err := tmp.Write(keyBytes); err != nil {
-        return fmt.Errorf("write key to temp file: %w", err)
-    }
-	
+	if _, err := tmp.Write(keyBytes); err != nil {
+		return fmt.Errorf("write key to temp file: %w", err)
+	}
+
 	// get all RPMs in the destDir
 	rpmPattern := filepath.Join(destDir, "*.rpm")
-    rpmPaths, err := filepath.Glob(rpmPattern)
-    if err != nil {
-        return fmt.Errorf("glob %q: %w", rpmPattern, err)
-    }
-    if len(rpmPaths) == 0 {
-        logger.Warn("no RPMs found to verify")
-        return nil
-    }
+	rpmPaths, err := filepath.Glob(rpmPattern)
+	if err != nil {
+		return fmt.Errorf("glob %q: %w", rpmPattern, err)
+	}
+	if len(rpmPaths) == 0 {
+		logger.Warn("no RPMs found to verify")
+		return nil
+	}
 
 	start := time.Now()
-    results := rpmutils.VerifyAll(rpmPaths, tmp.Name(), 4)
-    logger.Infof("RPM verification took %s", time.Since(start))
+	results := rpmutils.VerifyAll(rpmPaths, tmp.Name(), 4)
+	logger.Infof("RPM verification took %s", time.Since(start))
 
-    // Check results
-    for _, r := range results {
-        if !r.OK {
-            return fmt.Errorf("RPM %s failed verification: %v", r.Path, r.Error)
-        }
-    }
-    logger.Info("all RPMs verified successfully")
+	// Check results
+	for _, r := range results {
+		if !r.OK {
+			return fmt.Errorf("RPM %s failed verification: %v", r.Path, r.Error)
+		}
+	}
+	logger.Info("all RPMs verified successfully")
 
-    return nil
+	return nil
 }
 
 func (p *AzureLinux3) Resolve(destDir string) ([]string, error) {
@@ -153,8 +153,8 @@ func (p *AzureLinux3) Resolve(destDir string) ([]string, error) {
 
 	// Prepare the list of full paths the user asked for:
 	var roots []string
-	for _, pkg := range p.spec.Packages { 
-	roots = append(roots, filepath.Join(destDir, pkg))
+	for _, pkg := range p.spec.Packages {
+		roots = append(roots, filepath.Join(destDir, pkg))
 	}
 
 	// Resolve all deps
@@ -162,7 +162,6 @@ func (p *AzureLinux3) Resolve(destDir string) ([]string, error) {
 	logger.Infof("need total %d RPMs (including dependencies)", len(resolved))
 	return resolved, nil
 }
-
 
 // loadRepoConfig parses the repo configuration data
 func loadRepoConfig(r io.Reader) (repoConfig, error) {
@@ -230,6 +229,6 @@ func crawlDirectory(url string, pkgs *[]provider.PackageInfo) error {
 			}
 		}
 	}
-    
+
 	return s.Err()
 }

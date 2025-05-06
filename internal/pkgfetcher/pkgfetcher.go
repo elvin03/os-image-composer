@@ -2,6 +2,8 @@ package pkgfetcher
 
 import (
 	"fmt"
+	"github.com/schollz/progressbar/v3"
+	"go.uber.org/zap"
 	"io"
 	"net/http"
 	"os"
@@ -9,8 +11,6 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
-	"github.com/schollz/progressbar/v3"
-	"go.uber.org/zap"
 )
 
 // FetchPackages downloads the given URLs into destDir using a pool of workers.
@@ -27,8 +27,8 @@ func FetchPackages(urls []string, destDir string, workers int) error {
 		progressbar.OptionEnableColorCodes(true),
 		progressbar.OptionShowDescriptionAtLineEnd(),
 		progressbar.OptionSetWidth(30),
-  		progressbar.OptionShowCount(),
-  		progressbar.OptionThrottle(200 * time.Millisecond),
+		progressbar.OptionShowCount(),
+		progressbar.OptionThrottle(200*time.Millisecond),
 		progressbar.OptionSpinnerType(10),
 		progressbar.OptionSetTheme(progressbar.Theme{
 			Saucer:        "[green]=[reset]",
@@ -36,7 +36,7 @@ func FetchPackages(urls []string, destDir string, workers int) error {
 			SaucerPadding: " ",
 			BarStart:      "[",
 			BarEnd:        "]",
-		  }),
+		}),
 	)
 
 	// start worker goroutines
@@ -93,11 +93,10 @@ func FetchPackages(urls []string, destDir string, workers int) error {
 					}
 					return nil
 				}()
-				
 
 				if err != nil {
 					logger.Errorf("downloading %s failed: %v", url, err)
-				} 
+				}
 				// increment progress bar
 				if err := bar.Add(1); err != nil {
 					logger.Errorf("failed to add to progress bar: %v", err)

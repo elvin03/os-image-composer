@@ -49,10 +49,10 @@ func TestResolveDependencies_MultipleProviders(t *testing.T) {
 			"Y": {"pkgY.rpm"},
 		},
 		Requires: map[string][]string{
-			"pkgA.rpm":   {"X"},
-			"pkgP1.rpm":  {},
-			"pkgP2.rpm":  {"Y"},
-			"pkgY.rpm":   {},
+			"pkgA.rpm":  {"X"},
+			"pkgP1.rpm": {},
+			"pkgP2.rpm": {"Y"},
+			"pkgY.rpm":  {},
 		},
 	}
 	sel := []string{"pkgA.rpm"}
