@@ -38,15 +38,13 @@ flowchart TD
     
     Commands -->|provider| Provider[Manage OS Providers]
     
-    Commands -->|platform| Platform[Manage Platform Support]
-    
     %% Styling
     classDef command fill:#b5e2fa,stroke:#0077b6,stroke-width:2px;
     classDef process fill:#f8edeb,stroke:#333,stroke-width:1px;
     classDef decision fill:#ffd166,stroke:#333,stroke-width:1px;
     
     class Start command;
-    class Build,Validate,Cache,Template,Provider,Platform command;
+    class Build,Validate,Cache,Template,Provider command;
     class CheckCache decision;
     class ReadSpec,BuildProcess,SaveImage,UseCache,CacheOps process;
     
@@ -169,21 +167,6 @@ Subcommands:
 | `config PROVIDER` | Show provider configuration details including repository URLs, tools, and default settings for a specific provider. |
 | `test PROVIDER` | Test provider configuration by verifying dependencies and connectivity. Ensures the provider is properly configured before attempting a build. |
 
-### Platform Command
-
-Manage platform support for specialized environments like Azure or Edge Microvisor.
-
-```bash
-image-composer platform SUBCOMMAND
-```
-
-Subcommands:
-
-| Subcommand | Description |
-|------------|-------------|
-| `list` | List supported platforms with their versions and capabilities. Shows all specialized platform integrations available. |
-| `features PLATFORM` | Show available platform features for a specific target platform, including supported configurations and optimizations. |
-
 ## Examples
 
 ### Building an Image
@@ -302,7 +285,6 @@ build:
     - base                                   # Creates the base OS
     - packages                               # Installs required packages
     - configuration                          # Applies configurations
-    - platform                               # Applies platform-specific settings
     - finalize                               # Finalizes the image
 
 customizations:
@@ -330,14 +312,6 @@ customizations:
         - --interface
         - eth0
       run_in_chroot: true                    # Whether to run in chroot environment
-
-platform_specific:
-  # Platform-specific settings
-  edge_microvisor:                           # Settings for Edge Microvisor platform
-    toolkit_version: 2.5.0                   # Toolkit version to use
-    features:                                # Platform features to enable
-      - secure-boot
-      - remote-management
 
 output:
   # Output settings
