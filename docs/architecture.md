@@ -76,3 +76,26 @@ flowchart TD
     O --- E
     O --- F
 ```
+## Detailed Design 
+
+The following diagram depicts the list of SW entities and their relationships in composing user specified OS image.
+
+The following table captures the SW entities and their function.
+
+| SW Component | Description |
+| -------- | ------- |
+| CLI   | A commandline interface module that provides an interface enabling users to create desired OS images |
+| OS Image Provider Interface | As described above |
+| Debian Package Handler | SW component responsible for downloading, caching and serving the packages as needed to the OS Image providers  |
+| Debian Package Cache | SW component responsible for storing and retrieving the downloaded debian packages in an efficient way  |
+| RPM Package Handler | SW component responsible for downloading, caching and serving the packages as needed to the OS Image providers  |
+| RPM Package Cache | SW component responsible for storing and retrieving the downloaded rpm packages in an efficient way  |
+| Azure Linux Provider | SW component responsible for supporting creation of Azure Linux OS Images  |
+| EMT Provider | SW component responsible for supporting creation of EMT OS Images  |
+| Windriver LxR Provider | SW component responsible for supporting creation of WindRiver LxR Images  |
+| Chroot Environment | SW Component responsible for creation of chroot environment upon request, which would eventually be used to build the OS image|
+| Boot Image Composer | SW Component responsible for creation of Boot Image upon request by the OS provider to bundle boot images with kernel images|
+| Systemd-Boot Composer | SW Component responsible for creation of Systemd-Boot Image upon request by the Boot Image Composer|
+| ISO Generator | SW Component responsible for creation of Systemd-Boot Image upon request by the Boot Image Composer|
+
+## Architecture Opens
