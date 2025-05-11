@@ -2,6 +2,11 @@
 
 This document explains the Image-Composer build process in detail, describing how the tool creates customized OS images through a series of well-defined stages. Understanding this process will help you optimize your image builds and troubleshoot issues more effectively.
 
+## Related Documentation
+- [Understanding Caching in Image-Composer](./image-composer-caching.md) - Details on package and image caching systems
+- [Image-Composer CLI Specification](./image-composer-cli-specification.md) - Complete command-line reference
+- [Understanding Templates in Image-Composer](./image-composer-templates.md) - How to use and create reusable templates
+
 ## Overview of the Build Pipeline
 
 Image-Composer follows a staged build approach, splitting the image creation process into discrete phases. This architecture provides several advantages:
@@ -11,7 +16,7 @@ Image-Composer follows a staged build approach, splitting the image creation pro
 - **Flexibility**: Stages can be skipped or limited for debugging
 - **Extensibility**: New capabilities can be added to specific stages
 
-The build process processes a build specification file through a series of stages, each building upon the work of the previous stage.
+The build process processes a build specification file through a series of stages, each building upon the work of the previous stage. A build specification (or build spec) is a YAML file that defines all requirements and configurations for creating a custom OS image.
 
 ## Build Stages in Detail
 
@@ -39,6 +44,9 @@ Error: Provider 'ubuntu' is not configured in the global configuration
 Error: Invalid combination of compression 'gzip' with format 'vhd'
 ```
 
+See also:
+- [Validate Command](./image-composer-cli-specification.md#validate-command) for validating build specifications without building
+
 ### 2. Packages Stage
 
 **Purpose**: Collect all packages required for the image and prepare them for installation.
@@ -62,6 +70,9 @@ Error: Invalid combination of compression 'gzip' with format 'vhd'
 - Indirect dependencies (required by direct dependencies) are resolved automatically
 - Provider-specific tools are used for dependency resolution (e.g., apt for Ubuntu)
 
+See also:
+- [Package Cache](./image-composer-caching.md#package-cache) for details on how package caching works and benefits build performance
+
 ### 3. Compose Stage
 
 **Purpose**: Create the base image structure and install all packages.
@@ -83,6 +94,9 @@ Error: Invalid combination of compression 'gzip' with format 'vhd'
 **Working Directory**:
 - During this stage, significant disk space is used in the working directory
 - The working directory location can be configured globally or per command
+
+See also:
+- [Provider Command](./image-composer-cli-specification.md#provider-command) for managing OS providers used in the compose stage
 
 ### 4. Configuration Stage
 
@@ -108,6 +122,9 @@ Error: Invalid combination of compression 'gzip' with format 'vhd'
 - Destination paths are created if they don't exist
 - Symbolic links are preserved unless otherwise specified
 
+See also:
+- [Templates](./image-composer-templates.md#template-examples) for examples of template-based configurations
+
 ### 5. Finalize Stage
 
 **Purpose**: Verify the image, prepare it for output, and store it in the cache.
@@ -129,6 +146,9 @@ Error: Invalid combination of compression 'gzip' with format 'vhd'
 - The completed image is stored in the image cache based on a hash of the build spec
 - This enables instant retrieval of identical builds in the future
 - Image caching can be disabled using the `--no-image-cache` option
+
+See also:
+- [Image Cache](./image-composer-caching.md#image-cache) for details on how finished images are cached and reused
 
 ## Build Configuration Options
 
@@ -155,6 +175,9 @@ storage:
     max_count: 5                             # Number of images to keep per spec
 ```
 
+See also:
+- [Global Configuration File](./image-composer-cli-specification.md#global-configuration-file) for all available configuration options
+
 ### Build Specification Options
 
 These options are specified in the build specification file and affect that specific build:
@@ -171,6 +194,9 @@ build:
     - configuration
     - finalize
 ```
+
+See also:
+- [Build Specification File](./image-composer-cli-specification.md#build-specification-file) for complete build specification format
 
 ### Command-Line Overrides
 
@@ -189,6 +215,9 @@ image-composer build --skip-stage validate my-image-spec.yml
 # Set a maximum build duration
 image-composer build --timeout 30m my-image-spec.yml
 ```
+
+See also:
+- [Build Command](./image-composer-cli-specification.md#build-command) for all available command line options
 
 ## Common Build Patterns
 
@@ -264,6 +293,9 @@ customizations:
       destination: /etc/ufw/ufw.conf
 ```
 
+See also:
+- [Template Examples](./image-composer-templates.md#template-examples) for how these patterns can be templated
+
 ## Build Performance Optimization
 
 ### Improving Build Speed
@@ -281,6 +313,9 @@ customizations:
    - Place the working directory on fast storage (SSD)
    - Ensure adequate free space
 
+See also:
+- [Package Cache and Image Cache](./image-composer-caching.md#how-they-work-together) for details on caching mechanisms
+
 ### Reducing Build Time for Development
 
 1. **Build to Specific Stages**:
@@ -294,6 +329,9 @@ customizations:
 3. **Keep Temporary Files**:
    - Use `--keep-temp` during development to avoid rebuilding from scratch
    - Examine temporary files to debug issues
+
+See also:
+- [Template Usage](./image-composer-templates.md#using-templates-to-build-images) for streamlining development with templates
 
 ## Troubleshooting Build Issues
 
@@ -347,6 +385,9 @@ customizations:
    image-composer build --no-cache my-image-spec.yml
    ```
 
+See also:
+- [Troubleshooting](./image-composer-cli-specification.md#troubleshooting) for CLI-specific troubleshooting techniques
+
 ### Build Log Analysis
 
 Build logs can provide valuable information about failures. Key sections to check:
@@ -376,7 +417,3 @@ Key takeaways:
 2. **Caching System**: Both package and image caching improve performance significantly
 3. **Customization Options**: Multiple levels of configuration allow for precise control
 4. **Troubleshooting Tools**: Various command-line options facilitate debugging and problem-solving
-
-For more specific information about aspects of the build process, refer to the following documentation:
-- [Understanding Caching in Image-Composer](./image-composer-caching.md)
-- [Understanding Templates in Image-Composer](./image-composer-templates.md)

@@ -2,6 +2,11 @@
 
 The Image-Composer tool implements two complementary caching mechanisms to significantly improve build performance and reduce resource usage: **Package Cache** and **Image Cache**. This document explains how these caching systems work and how to manage them effectively.
 
+## Related Documentation
+- [Understanding the Build Process](./image-composer-build-process.md) - Details on the five-stage build pipeline
+- [Image-Composer CLI Specification](./image-composer-cli-specification.md) - Complete command-line reference
+- [Understanding Templates in Image-Composer](./image-composer-templates.md) - How to use and create reusable templates
+
 ## Overview of Caching Mechanisms
 
 Image-Composer uses a layered caching approach:
@@ -10,6 +15,9 @@ Image-Composer uses a layered caching approach:
 |------------|---------|---------------------|
 | Package Cache | Stores downloaded OS packages | Reduces network usage and download time |
 | Image Cache | Stores complete built OS images | Eliminates entire build process for identical builds |
+
+See also:
+- [Build Stages in Detail](./image-composer-build-process.md#build-stages-in-detail) for how caching integrates with the build process
 
 ## Package Cache
 
@@ -42,6 +50,9 @@ The package cache stores downloaded OS packages (like .deb files for Ubuntu or .
 - Enables building images without internet access (if packages were previously cached)
 - Works even when build specifications change
 
+See also:
+- [Packages Stage](./image-composer-build-process.md#2-packages-stage) for how package cache is utilized during the build process
+
 ## Image Cache
 
 ### What Image Cache Does
@@ -71,6 +82,9 @@ The image cache stores complete built OS images to skip the entire build process
 - Enables quick testing of deployment procedures without rebuilding
 - Particularly valuable in CI/CD pipelines and testing environments
 
+See also:
+- [Finalize Stage](./image-composer-build-process.md#5-finalize-stage) for how images are stored in the cache during build completion
+
 ## How They Work Together
 
 The two caching mechanisms complement each other and operate at different levels:
@@ -87,18 +101,25 @@ flowchart TD
     
     CheckImageCache -->|No| BuildProcess[Start Build Process]
     
-    BuildProcess --> PackageInstall[Package Installation Phase]
-    PackageInstall --> CheckPackageCache{Package in Cache?}
+    BuildProcess --> DeterminePackages[Determine Required Packages]
+    DeterminePackages --> ResolveDependencies[Resolve Package Dependencies]
+    ResolveDependencies --> PackageLoop[Process Each Package]
+    
+    PackageLoop --> CheckPackageCache{Required version in Cache?}
     
     CheckPackageCache -->|Yes| UsePackageCache[Use Cached Package]
     CheckPackageCache -->|No| DownloadPackage[Download Package]
-    DownloadPackage --> StoreInPackageCache[Store in Package Cache]
-    StoreInPackageCache --> InstallPackage[Install Package]
-    UsePackageCache --> InstallPackage
+    DownloadPackage --> VerifyPackage[Verify Package Integrity]
+    VerifyPackage --> StoreInPackageCache[Store in Package Cache]
+    StoreInPackageCache --> CollectPackage[Collect Package for Installation]
+    UsePackageCache --> CollectPackage
     
-    InstallPackage --> MorePackages{More Packages?}
-    MorePackages -->|Yes| PackageInstall
-    MorePackages -->|No| FinalizeImage[Finalize Image]
+    CollectPackage --> MorePackages{More Packages?}
+    MorePackages -->|Yes| PackageLoop
+    MorePackages -->|No| ComposeStage[Proceed to Compose Stage]
+    
+    ComposeStage --> ConfigurationStage[Configuration Stage]
+    ConfigurationStage --> FinalizeImage[Finalize Image]
     
     FinalizeImage --> StoreInImageCache[Store in Image Cache]
     StoreInImageCache --> Done
@@ -108,11 +129,13 @@ flowchart TD
     classDef decision fill:#fffacd,stroke:#d4b106,stroke-width:1px;
     classDef cache fill:#d1f0da,stroke:#0e7735,stroke-width:1px;
     classDef endpoint fill:#b5e2fa,stroke:#0077b6,stroke-width:2px;
+    classDef stage fill:#f8edeb,stroke:#333,stroke-width:2px,stroke-dasharray: 5 5;
     
     class Start,Done endpoint;
     class CheckImageCache,CheckPackageCache,MorePackages decision;
     class UseCachedImage,UsePackageCache,StoreInPackageCache,StoreInImageCache cache;
-    class ReadSpec,GenerateHash,BuildProcess,PackageInstall,DownloadPackage,InstallPackage,FinalizeImage,CopyToOutput process;
+    class ReadSpec,GenerateHash,BuildProcess,DeterminePackages,ResolveDependencies,PackageLoop,DownloadPackage,VerifyPackage,CollectPackage process;
+    class ComposeStage,ConfigurationStage stage;
 ```
 
 This approach ensures:
@@ -127,6 +150,9 @@ This approach ensures:
 
 3. **Flexibility**:
    - Each mechanism can be enabled/disabled independently
+
+See also:
+- [Build Configuration Options](./image-composer-build-process.md#build-configuration-options) for controlling cache behavior
 
 ## Managing Caches via CLI
 
@@ -165,6 +191,9 @@ image-composer cache export abc123def456 ./my-exported-image.qcow2
 image-composer cache import ./my-image.qcow2
 ```
 
+See also:
+- [Cache Command](./image-composer-cli-specification.md#cache-command) for complete cache management options
+
 ## Configuration Options
 
 ### Global Configuration (in config.yaml)
@@ -202,6 +231,10 @@ image-composer build --no-package-cache my-image-spec.yml
 image-composer build --no-image-cache my-image-spec.yml
 ```
 
+See also:
+- [Global Configuration File](./image-composer-cli-specification.md#global-configuration-file) for all available configuration options
+- [Command-Line Overrides](./image-composer-build-process.md#command-line-overrides) for additional build options
+
 ## Best Practices
 
 1. **Keep Caching Enabled**:
@@ -228,3 +261,6 @@ image-composer build --no-image-cache my-image-spec.yml
    - If encountering unexplained issues, try building with `--no-cache` first
    - This helps determine if a cached component is causing problems
 
+See also:
+- [Build Performance Optimization](./image-composer-build-process.md#build-performance-optimization) for additional performance tips
+- [Troubleshooting Build Issues](./image-composer-build-process.md#troubleshooting-build-issues) for debugging problems
