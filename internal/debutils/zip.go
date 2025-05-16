@@ -16,7 +16,7 @@ func Decompress(inFile string) ([]string, error) {
 	}
 	defer gzFile.Close()
 
-	decompressedFile := "Packages"
+	decompressedFile := "/tmp/Packages"
 	outDecompressed, err := os.Create(decompressedFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create decompressed file: %v", err)
@@ -37,7 +37,7 @@ func Decompress(inFile string) ([]string, error) {
 	return []string{decompressedFile}, nil
 }
 
-func Download(repoURL string) ([]string, error) {
+func Download(repoURL string, outFile string) ([]string, error) {
 
 	resp, err := http.Get(repoURL)
 	if err != nil {
@@ -50,7 +50,6 @@ func Download(repoURL string) ([]string, error) {
 	}
 
 	// Store the .gz file locally
-	outFile := "Packages.gz"
 	out, err := os.Create(outFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create file: %v", err)

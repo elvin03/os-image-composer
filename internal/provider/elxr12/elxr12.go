@@ -1,14 +1,14 @@
 package elxr12
 
 import (
-	"fmt"
-
 	"github.com/intel-innersource/os.linux.tiberos.os-curation-tool/internal/config"
 	"github.com/intel-innersource/os.linux.tiberos.os-curation-tool/internal/debutils"
 	"github.com/intel-innersource/os.linux.tiberos.os-curation-tool/internal/provider"
 	"go.uber.org/zap"
 )
 
+// ref: https://packages.microsoft.com/azurelinux/3.0/prod/base/
+// example: https://deb.debian.org/debian/pool/main/0/0ad/0ad_0.0.26-3_amd64.deb
 const (
 	baseURL    = "https://deb.debian.org/debian/dists/bookworm/main/"
 	configName = "Packages.gz"
@@ -19,7 +19,8 @@ const (
 type repoConfig struct {
 	Section      string // raw section header
 	Name         string // human-readable name from name=
-	URL          string
+	CfgURL       string
+	PkgUrl       string
 	GPGCheck     bool
 	RepoGPGCheck bool
 	Enabled      bool
@@ -61,19 +62,29 @@ func (p *eLxr12) Init(spec *config.BuildSpec) error {
 		logger.Errorf("parsing repo config failed: %v", err)
 		return err
 	}
+	p.repoCfg = cfg
+	p.gzHref = cfg.CfgURL
 
-	// logger.Infof("exlr repo URL: %s\n", p.repoURL)
-	logger.Infof("exlr repo URL: %s\n", cfg)
-
-	zap.L().Sync() // flush logs if needed
-	panic("Stopped by yockgen.")
+	logger.Infof("initialized eLxr provider repo section=%s", cfg.Section)
+	logger.Infof("name=%s", cfg.Name)
+	logger.Infof("config url=%s", cfg.CfgURL)
+	logger.Infof("package download url=%s", cfg.PkgUrl)
+	logger.Infof("primary.xml.gz=%s", p.gzHref)
+	return nil
 
 }
 
 // Packages returns the list of packages
 func (p *eLxr12) Packages() ([]provider.PackageInfo, error) {
+
 	logger := zap.L().Sugar()
 	logger.Infof("Packages() called - Placeholder: This function will be implemented by the respective owner.")
+
+	debutils.ParsePrimary(p.repoURL, p.gzHref)
+
+	// zap.L().Sync() // flush logs if needed
+	// panic("Stopped by yockgen.")
+
 	return nil, nil
 }
 
@@ -101,24 +112,19 @@ func (p *eLxr12) MatchRequested(requests []string, all []provider.PackageInfo) (
 func loadRepoConfig(repoUrl string) (repoConfig, error) {
 	logger := zap.L().Sugar()
 
-	// Download the debian repo .gz file
-	zipFiles, err := debutils.Download(repoUrl)
-	if err != nil {
-		logger.Errorf("failed to download repo file: %v", err)
-		return repoConfig{}, err
-	}
+	var rc repoConfig
 
-	// Decompress the .gz file and store the decompressed file in the same location
-	if len(zipFiles) == 0 {
-		logger.Errorf("no files downloaded from repo URL: %s", repoUrl)
-		return repoConfig{}, fmt.Errorf("no files downloaded from repo URL: %s", repoUrl)
-	}
-	files, err := debutils.Decompress(zipFiles[0])
-	if err != nil {
-		logger.Errorf("failed to decompress file: %v", err)
-		return repoConfig{}, err
-	}
-	logger.Infof("decompressed files: %v", files)
+	//wget https://deb.debian.org/debian/pool/main/0/0ad/0ad_0.0.26-3_amd64.deb
+	rc.CfgURL = repoUrl
+	rc.PkgUrl = "https://deb.debian.org/debian/pool/"
+	rc.Name = "Debian Bookworm Main"
+	rc.GPGCheck = true
+	rc.RepoGPGCheck = true
+	rc.Enabled = true
+	rc.GPGKey = "https://ftp-master.debian.org/keys/release-12.asc"
+	rc.Section = "main"
 
-	return repoConfig{}, nil
+	logger.Infof("repo config: %+v", rc)
+
+	return rc, nil
 }
