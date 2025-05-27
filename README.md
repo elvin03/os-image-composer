@@ -14,6 +14,10 @@ and WindRiver Linux.
 
 ## Get Started
 
+### Prerequisites
+
+Image Composer Tool is developed in golang and requires installation of go version 1.22.12+. Instructions to install for a specific distribution can be found [here](https://go.dev/doc/manage-install).
+
 ### Building
 
 Build the image-composer using Go directly:
