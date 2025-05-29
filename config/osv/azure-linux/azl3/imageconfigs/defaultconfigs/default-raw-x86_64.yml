@@ -39,10 +39,9 @@ systemConfigs:
     description: Default yml configuration for raw image
 
     bootloader:
-      type: grub
+      type: grub # (grub or systemd-boot)
       grub:
-        bootType: efi
-        efiProvider: systemd-boot
+        bootType: efi # (efi or legacy)
 
     packages:
       - filesystem
