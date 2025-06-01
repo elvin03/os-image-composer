@@ -37,7 +37,7 @@ func TestInvalid(t *testing.T) {
 }
 
 func TestValidImage(t *testing.T) {
-	v := loadFile(t, "image-templates/default-image-template.yml")
+	v := loadFile(t, "image-templates/azl3-x86_64-edge-raw.yml")
 
 	// Parse to generic JSON interface
 	var raw interface{}
@@ -51,7 +51,7 @@ func TestValidImage(t *testing.T) {
 		t.Errorf("json marshaling error: %v", err)
 	}
 	if err := ValidateImageJSON(dataJSON); err != nil {
-		t.Errorf("expected image-templates/default-image-template.yml to pass, but got: %v", err)
+		t.Errorf("expected image-templates/azl3-x86_64-edge-raw.yml to pass, but got: %v", err)
 	}
 }
 
