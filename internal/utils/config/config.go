@@ -61,7 +61,7 @@ type LoggingConfig struct {
 
 // LoadTemplate loads an ImageTemplate from the specified YAML template path
 func LoadTemplate(path string) (*ImageTemplate, error) {
-	logger := logger.Logger()
+	log := logger.Logger()
 
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -79,7 +79,7 @@ func LoadTemplate(path string) (*ImageTemplate, error) {
 		return nil, fmt.Errorf("loading YAML template: %w", err)
 	}
 
-	logger.Infof("loaded image template from %s: name=%s, os=%s, dist=%s, arch=%s",
+	log.Infof("loaded image template from %s: name=%s, os=%s, dist=%s, arch=%s",
 		path, template.Image.Name, template.Target.OS, template.Target.Dist, template.Target.Arch)
 	return template, nil
 }

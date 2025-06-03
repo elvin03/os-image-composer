@@ -50,17 +50,17 @@ func main() {
 	rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
 		if logLevel != "" {
 			globalConfig.Logging.Level = logLevel
-			utils.SetLogLevel(logLevel)
+			logger.SetLogLevel(logLevel)
 		}
 	}
 
 	// Log configuration info
-	logger := logger.Logger()
+	log := logger.Logger()
 	if configFilePath != "" {
-		logger.Infof("Using configuration from: %s", configFilePath)
+		log.Infof("Using configuration from: %s", configFilePath)
 	}
 	if globalConfig.Logging.Level == "debug" {
-		logger.Debugf("Config: workers=%d, cache_dir=%s, work_dir=%s, temp_dir=%s",
+		log.Debugf("Config: workers=%d, cache_dir=%s, work_dir=%s, temp_dir=%s",
 			globalConfig.Workers, globalConfig.CacheDir, globalConfig.WorkDir, globalConfig.TempDir)
 	}
 

@@ -25,8 +25,8 @@ type SoftwarePackageManifest struct {
 
 // WriteManifestToFile writes the manifest to the specified output file.
 func WriteManifestToFile(manifest SoftwarePackageManifest, outputFile string) error {
-	logger := logger.Logger()
-	logger.Infof("Writing the Image Manifest to the file: %s", outputFile)
+	log := logger.Logger()
+	log.Infof("Writing the Image Manifest to the file: %s", outputFile)
 	// Marshal the manifest struct to JSON
 	manifestJSON, err := json.MarshalIndent(manifest, "", "  ")
 	if err != nil {
