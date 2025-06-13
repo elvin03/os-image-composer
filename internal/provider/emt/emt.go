@@ -1,4 +1,4 @@
-package emt30
+package emt
 
 import (
 	"bufio"
@@ -6,14 +6,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
-	"path/filepath"
-	"sort"
 	"strings"
-	"time"
 
 	"github.com/open-edge-platform/image-composer/internal/config"
-	"github.com/open-edge-platform/image-composer/internal/ospackage/rpmutils"
 	"github.com/open-edge-platform/image-composer/internal/provider"
 	"github.com/open-edge-platform/image-composer/internal/utils/logger"
 )
@@ -34,23 +29,24 @@ type repoConfig struct {
 	GPGKey       string
 }
 
-// Emt30 implements provider.Provider
-type Emt30 struct {
-	repoURL  string
-	repoCfg  repoConfig
-	zstHref  string
-	template *config.ImageTemplate
+// Emt implements provider.Provider
+type Emt struct {
+	repoURL string
+	repoCfg repoConfig
+	zstHref string
 }
 
-func init() {
-	provider.Register(&Emt30{})
+func Register(dist, arch string) {
+	provider.Register(&Emt{}, dist, arch)
 }
 
 // Name returns the unique name of the provider
-func (p *Emt30) Name() string { return "EMT3.0" }
+func (p *Emt) Name(dist, arch string) string {
+	return GetProviderId(dist, arch)
+}
 
 // Init will initialize the provider, fetching repo configuration
-func (p *Emt30) Init(template *config.ImageTemplate) error {
+func (p *Emt) Init(dist, arch string) error {
 	log := logger.Logger()
 
 	resp, err := http.Get(configURL)
@@ -74,7 +70,7 @@ func (p *Emt30) Init(template *config.ImageTemplate) error {
 
 	p.repoURL = configURL
 	p.repoCfg = cfg
-	p.template = template
+
 	p.zstHref = href
 
 	log.Infof("initialized EMT3.0 provider repo section=%s", cfg.Section)
@@ -84,138 +80,20 @@ func (p *Emt30) Init(template *config.ImageTemplate) error {
 	return nil
 }
 
-// Packages returns the list of packages
-func (p *Emt30) Packages() ([]provider.PackageInfo, error) {
-	log := logger.Logger()
-	log.Infof("fetching packages from %s", p.repoCfg.URL)
-
-	packages, err := rpmutils.ParsePrimary(p.repoCfg.URL, p.zstHref)
-	if err != nil {
-		log.Errorf("parsing primary.xml.zst failed: %v", err)
-		return nil, err
-	}
-
-	log.Infof("found %d packages in EMT30 repo", len(packages))
-	return packages, nil
-}
-
-// MatchRequested takes the list of requested packages and returns
-func (p *Emt30) MatchRequested(requests []string, all []provider.PackageInfo) ([]provider.PackageInfo, error) {
-	var out []provider.PackageInfo
-
-	for _, want := range requests {
-		var candidates []provider.PackageInfo
-		for _, pi := range all {
-			// 1) exact name match
-			if pi.Name == want || pi.Name == want+".rpm" {
-				candidates = append(candidates, pi)
-				break
-			}
-			// 2) prefix by want-version ("acl-")
-			if strings.HasPrefix(pi.Name, want+"-") {
-				candidates = append(candidates, pi)
-				continue
-			}
-			// 3) prefix by want.release ("acl-2.3.1-2.")
-			if strings.HasPrefix(pi.Name, want+".") {
-				candidates = append(candidates, pi)
-			}
-		}
-
-		if len(candidates) == 0 {
-			return nil, fmt.Errorf("requested package %q not found in repo", want)
-		}
-		// If we got an exact match in step (1), it's the only candidate
-		if len(candidates) == 1 && (candidates[0].Name == want || candidates[0].Name == want+".rpm") {
-			out = append(out, candidates[0])
-			continue
-		}
-		// Otherwise pick the "highest" by lex sort
-		sort.Slice(candidates, func(i, j int) bool {
-			return candidates[i].Name > candidates[j].Name
-		})
-		out = append(out, candidates[0])
-	}
-	return out, nil
-}
-
-// Validate verifies the downloaded files
-func (p *Emt30) Validate(destDir string) error {
-	log := logger.Logger()
-
-	// read the GPG key from the repo config
-	resp, err := http.Get(p.repoCfg.GPGKey)
-	if err != nil {
-		return fmt.Errorf("fetch GPG key %s: %w", p.repoCfg.GPGKey, err)
-	}
-	defer resp.Body.Close()
-
-	keyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("read GPG key body: %w", err)
-	}
-	log.Infof("fetched GPG key (%d bytes)", len(keyBytes))
-	log.Debugf("GPG key: %s\n", keyBytes)
-
-	// store in a temp file
-	tmp, err := os.CreateTemp("", "emt-gpg-*.asc")
-	if err != nil {
-		return fmt.Errorf("create temp key file: %w", err)
-	}
-	defer func() {
-		tmp.Close()
-		os.Remove(tmp.Name())
-	}()
-
-	if _, err := tmp.Write(keyBytes); err != nil {
-		return fmt.Errorf("write key to temp file: %w", err)
-	}
-
-	// get all RPMs in the destDir
-	rpmPattern := filepath.Join(destDir, "*.rpm")
-	rpmPaths, err := filepath.Glob(rpmPattern)
-	if err != nil {
-		return fmt.Errorf("glob %q: %w", rpmPattern, err)
-	}
-	if len(rpmPaths) == 0 {
-		log.Warn("no RPMs found to verify")
-		return nil
-	}
-
-	start := time.Now()
-	results := rpmutils.VerifyAll(rpmPaths, tmp.Name(), 4)
-	log.Infof("RPM verification took %s", time.Since(start))
-
-	// Check results
-	for _, r := range results {
-		if !r.OK {
-			return fmt.Errorf("RPM %s failed verification: %v", r.Path, r.Error)
-		}
-	}
-	log.Info("all RPMs verified successfully")
-
+func (p *Emt) PreProcess(template *config.ImageTemplate) error {
 	return nil
 }
 
-// Resolve resolves dependencies
-func (p *Emt30) Resolve(req []provider.PackageInfo, all []provider.PackageInfo) ([]provider.PackageInfo, error) {
-	log := logger.Logger()
+func (p *Emt) BuildImage(template *config.ImageTemplate) error {
+	return nil
+}
 
-	log.Infof("resolving dependencies for %d RPMs", len(req))
+func (p *Emt) PostProcess(template *config.ImageTemplate) error {
+	return nil
+}
 
-	// Resolve all the required dependencies for the initial seed of RPMs
-	needed, err := rpmutils.ResolvePackageInfos(req, all)
-	if err != nil {
-		log.Errorf("resolving dependencies failed: %v", err)
-		return nil, err
-	}
-	log.Infof("need a total of %d RPMs (including dependencies)", len(needed))
-
-	for _, pkg := range needed {
-		log.Debugf("-> %s", pkg.Name)
-	}
-
-	return needed, nil
+func GetProviderId(dist, arch string) string {
+	return "edge-microvisor-toolkit" + "-" + dist + "-" + arch
 }
 
 // loadRepoConfig parses the repo configuration data

@@ -5,12 +5,12 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/open-edge-platform/image-composer/internal/provider"
+	"github.com/open-edge-platform/image-composer/internal/ospackage"
 )
 
 // Helper function to extract just the names from a slice of PackageInfo
 // for easier comparison in tests.
-func getNames(pkgs []provider.PackageInfo) []string {
+func getNames(pkgs []ospackage.PackageInfo) []string {
 	names := make([]string, len(pkgs))
 	for i, p := range pkgs {
 		names[i] = p.Name
@@ -22,14 +22,14 @@ func TestSortPackages(t *testing.T) {
 
 	testCases := []struct {
 		name          string
-		input         []provider.PackageInfo
+		input         []ospackage.PackageInfo
 		want          []string
 		wantErr       bool
 		isOrderStrict bool // If true, the exact order of `want` is checked.
 	}{
 		{
 			name: "Simple Chain Dependency",
-			input: []provider.PackageInfo{
+			input: []ospackage.PackageInfo{
 				{Name: "C", Requires: []string{"B"}},
 				{Name: "B", Requires: []string{"A"}},
 				{Name: "A"},
@@ -40,7 +40,7 @@ func TestSortPackages(t *testing.T) {
 		},
 		{
 			name: "Complex Diamond Dependency",
-			input: []provider.PackageInfo{
+			input: []ospackage.PackageInfo{
 				{Name: "app", Requires: []string{"lib-a", "lib-b"}},
 				{Name: "lib-a", Requires: []string{"lib-c"}},
 				{Name: "lib-b", Requires: []string{"lib-c"}},
@@ -53,7 +53,7 @@ func TestSortPackages(t *testing.T) {
 		},
 		{
 			name: "Circular Dependency",
-			input: []provider.PackageInfo{
+			input: []ospackage.PackageInfo{
 				{Name: "A", Requires: []string{"B"}},
 				{Name: "B", Requires: []string{"A"}},
 			},
@@ -64,7 +64,7 @@ func TestSortPackages(t *testing.T) {
 		},
 		{
 			name: "Multi-Package Cycle",
-			input: []provider.PackageInfo{
+			input: []ospackage.PackageInfo{
 				{Name: "C", Requires: []string{"B"}},
 				{Name: "B", Requires: []string{"A"}},
 				{Name: "A", Requires: []string{"C"}},
@@ -77,7 +77,7 @@ func TestSortPackages(t *testing.T) {
 		},
 		{
 			name: "Already Resolved Dependency",
-			input: []provider.PackageInfo{
+			input: []ospackage.PackageInfo{
 				{Name: "app", Requires: []string{"nginx"}},
 				{Name: "nginx"},
 			},
@@ -87,14 +87,14 @@ func TestSortPackages(t *testing.T) {
 		},
 		{
 			name:          "Empty Input Slice",
-			input:         []provider.PackageInfo{},
+			input:         []ospackage.PackageInfo{},
 			want:          []string{},
 			wantErr:       false,
 			isOrderStrict: true,
 		},
 		{
 			name: "Single Package",
-			input: []provider.PackageInfo{
+			input: []ospackage.PackageInfo{
 				{Name: "single-package"},
 			},
 			want:          []string{"single-package"},

@@ -63,6 +63,13 @@ type Disk struct {
 	Partitions         []PartitionInfo `yaml:"partitions"`         // List of partitions to create in the disk image
 }
 
+var (
+	TargetOs        string
+	TargetDist      string
+	TargetArch      string
+	TargetImageType string
+)
+
 // LoadTemplate loads an ImageTemplate from the specified YAML template path
 func LoadTemplate(path string) (*ImageTemplate, error) {
 	log := logger.Logger()
@@ -83,6 +90,9 @@ func LoadTemplate(path string) (*ImageTemplate, error) {
 		return nil, fmt.Errorf("loading YAML template: %w", err)
 	}
 
+	TargetOs = template.Target.OS
+	TargetDist = template.Target.Dist
+	TargetArch = template.Target.Arch
 	log.Infof("loaded image template from %s: name=%s, os=%s, dist=%s, arch=%s",
 		path, template.Image.Name, template.Target.OS, template.Target.Dist, template.Target.Arch)
 	return template, nil
@@ -166,4 +176,8 @@ func (t *ImageTemplate) GetSystemConfigName() string {
 		return t.SystemConfigs[0].Name
 	}
 	return ""
+}
+
+func SaveUpdatedConfigFile(path string, config *ImageTemplate) error {
+	return nil
 }

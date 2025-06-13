@@ -9,13 +9,17 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/open-edge-platform/image-composer/internal/ospackage"
 	"github.com/open-edge-platform/image-composer/internal/ospackage/pkgfetcher"
-	"github.com/open-edge-platform/image-composer/internal/provider"
 	"github.com/open-edge-platform/image-composer/internal/utils/logger"
 )
 
+func GenerateDot(pkgs []ospackage.PackageInfo, file string) error {
+	return nil
+}
+
 // ParsePrimary parses the Packages.gz file from gzHref.
-func ParsePrimary(baseURL string, pkggz string, releaseFile string, releaseSign string, pbGPGKey string, buildPath string) ([]provider.PackageInfo, error) {
+func ParsePrimary(baseURL string, pkggz string, releaseFile string, releaseSign string, pbGPGKey string, buildPath string) ([]ospackage.PackageInfo, error) {
 	log := logger.Logger()
 
 	// Ensure pkgMetaDir exists, create if not
@@ -77,7 +81,7 @@ func ParsePrimary(baseURL string, pkggz string, releaseFile string, releaseSign 
 
 	files, err := Decompress(PkgMetaFile, pkgMetaFileNoExt)
 	if err != nil {
-		return []provider.PackageInfo{}, err
+		return []ospackage.PackageInfo{}, err
 	}
 	log.Infof("decompressed files: %v", files)
 
@@ -88,8 +92,8 @@ func ParsePrimary(baseURL string, pkggz string, releaseFile string, releaseSign 
 	}
 	defer f.Close()
 
-	var pkgs []provider.PackageInfo
-	pkg := provider.PackageInfo{}
+	var pkgs []ospackage.PackageInfo
+	pkg := ospackage.PackageInfo{}
 	reader := bufio.NewReader(f)
 	for {
 		line, err := reader.ReadString('\n')
@@ -102,7 +106,7 @@ func ParsePrimary(baseURL string, pkggz string, releaseFile string, releaseSign 
 			// End of one package entry
 			if pkg.Name != "" {
 				pkgs = append(pkgs, pkg)
-				pkg = provider.PackageInfo{}
+				pkg = ospackage.PackageInfo{}
 			}
 			if err == io.EOF {
 				break
@@ -173,10 +177,10 @@ func ParsePrimary(baseURL string, pkggz string, releaseFile string, releaseSign 
 // ResolvePackageInfos takes a seed list of PackageInfos (the exact versions
 // matched) and the full list of all PackageInfos from the repo, and
 // returns the minimal closure of PackageInfos needed to satisfy all Requires.
-func ResolvePackageInfos(requested []provider.PackageInfo, all []provider.PackageInfo) ([]provider.PackageInfo, error) {
+func ResolvePackageInfos(requested []ospackage.PackageInfo, all []ospackage.PackageInfo) ([]ospackage.PackageInfo, error) {
 	// Build maps for fast lookup
-	byNameVer := make(map[string]provider.PackageInfo, len(all))
-	byProvides := make(map[string]provider.PackageInfo)
+	byNameVer := make(map[string]ospackage.PackageInfo, len(all))
+	byProvides := make(map[string]ospackage.PackageInfo)
 	for _, pi := range all {
 		if pi.Version != "" {
 			key := fmt.Sprintf("%s=%s", pi.Name, pi.Version)
@@ -188,7 +192,7 @@ func ResolvePackageInfos(requested []provider.PackageInfo, all []provider.Packag
 	}
 
 	neededSet := make(map[string]struct{})
-	queue := make([]provider.PackageInfo, 0, len(requested))
+	queue := make([]ospackage.PackageInfo, 0, len(requested))
 	for _, pi := range requested {
 		if pi.Version != "" {
 			key := fmt.Sprintf("%s=%s", pi.Name, pi.Version)
@@ -198,7 +202,7 @@ func ResolvePackageInfos(requested []provider.PackageInfo, all []provider.Packag
 			}
 		}
 		// Always pull the latest version for requested packages
-		var latest *provider.PackageInfo
+		var latest *ospackage.PackageInfo
 		for _, pkg := range all {
 			if pkg.Name == pi.Name {
 				if latest == nil {
@@ -227,7 +231,7 @@ func ResolvePackageInfos(requested []provider.PackageInfo, all []provider.Packag
 		return nil, fmt.Errorf("requested package %q not in repo listing", pi.Name)
 	}
 
-	result := make([]provider.PackageInfo, 0)
+	result := make([]ospackage.PackageInfo, 0)
 
 	for len(queue) > 0 {
 		cur := queue[0]
@@ -276,7 +280,7 @@ func ResolvePackageInfos(requested []provider.PackageInfo, all []provider.Packag
 					queue = append(queue, depPkg)
 					continue
 				}
-				var found *provider.PackageInfo
+				var found *ospackage.PackageInfo
 				for _, pi := range all {
 					if pi.Name == depName {
 						cmp, err := compareDebianVersions(pi.Version, depVersion)
@@ -307,7 +311,7 @@ func ResolvePackageInfos(requested []provider.PackageInfo, all []provider.Packag
 				return nil, fmt.Errorf("dependency %q (version %q or higher) required by %q not found in repo", depName, depVersion, cur.Name)
 			}
 			// Always pull the latest version for unconstrained dependencies
-			var latest *provider.PackageInfo
+			var latest *ospackage.PackageInfo
 			for _, pi := range all {
 				if pi.Name == depName {
 					if latest == nil {
@@ -329,7 +333,7 @@ func ResolvePackageInfos(requested []provider.PackageInfo, all []provider.Packag
 				queue = append(queue, *latest)
 			} else if provPkg, ok := byProvides[depName]; ok {
 				// Find the latest version of provPkg.Name based on provPkg.Version
-				var latestProv *provider.PackageInfo
+				var latestProv *ospackage.PackageInfo
 				for _, pi := range all {
 					if pi.Name == provPkg.Name {
 						if latestProv == nil {

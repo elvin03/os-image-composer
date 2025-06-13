@@ -6,18 +6,18 @@ import (
 
 	"slices"
 
-	"github.com/open-edge-platform/image-composer/internal/provider"
+	"github.com/open-edge-platform/image-composer/internal/ospackage"
 	"github.com/open-edge-platform/image-composer/internal/utils/logger"
 )
 
 // SortPackages takes a slice of packages and returns them in a valid installation order.
 // This function is robust against dependency cycles. It identifies groups of cyclically
 // dependent packages (Strongly Connected Components) and sorts them as single units.
-func SortPackages(packages []provider.PackageInfo) ([]provider.PackageInfo, error) {
+func SortPackages(packages []ospackage.PackageInfo) ([]ospackage.PackageInfo, error) {
 	logger := logger.Logger()
 	logger.Infof("Sorting %d packages for installation using SCC-based topological sort", len(packages))
 	if len(packages) == 0 {
-		return []provider.PackageInfo{}, nil
+		return []ospackage.PackageInfo{}, nil
 	}
 
 	// Build Adjacency List Graph
@@ -99,12 +99,12 @@ func SortPackages(packages []provider.PackageInfo) ([]provider.PackageInfo, erro
 	}
 
 	// Flatten the sorted SCCs into the final package list
-	packageMap := make(map[string]provider.PackageInfo)
+	packageMap := make(map[string]ospackage.PackageInfo)
 	for _, p := range packages {
 		packageMap[p.Name] = p
 	}
 
-	var sortedPackages []provider.PackageInfo
+	var sortedPackages []ospackage.PackageInfo
 	for _, sccID := range sortedSccIndices {
 		scc := sccs[sccID]
 		// The order within a cycle doesn't matter, so we sort alphabetically

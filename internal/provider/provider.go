@@ -4,37 +4,22 @@ import (
 	"github.com/open-edge-platform/image-composer/internal/config"
 )
 
-// PackageInfo holds everything you need to fetch + verify one artifact.
-type PackageInfo struct {
-	Name     string   // e.g. "abseil-cpp"
-	Version  string   // e.g. "7.88.1-10+deb12u5"
-	URL      string   // download URL
-	Checksum string   // optional pre-known digest
-	Provides []string // capabilities this package provides (rpm:entry names)
-	Requires []string // capabilities this package requires
-	Files    []string // list of files in this package (rpm:files)
-}
-
 // Provider is the interface every OSV plugin must implement.
 type Provider interface {
-	// Name is a unique ID, e.g. "AzureLinux3" or "EMT3.0".
-	Name() string
+	// Name is a unique ID, combines os. dist and arch.
+	Name(dist, arch string) string
 
 	// Init does any one-time setup: import GPG keys, register repos, etc.
-	Init(template *config.ImageTemplate) error
+	Init(dist, arch string) error
 
-	// Packages returns the list of PackageInfo for this image build.
-	Packages() ([]PackageInfo, error)
+	// PreProcess does any pre-processing before the image is built, such as downloading files.
+	PreProcess(template *config.ImageTemplate) error
 
-	// Validate walks the destDir and verifies each downloaded file.
-	Validate(destDir string) error
+	// BuildImage is the main function that builds the image.
+	BuildImage(template *config.ImageTemplate) error
 
-	// MatchRequested takes the list of requested packages and returns
-	// the list of PackageInfo that match.
-	MatchRequested(requested []string, all []PackageInfo) ([]PackageInfo, error)
-
-	// Resolve walks dependencies and returns the full list of packages needed.
-	Resolve(req []PackageInfo, all []PackageInfo) ([]PackageInfo, error)
+	// PostProcess does any final steps after the image is built.
+	PostProcess(template *config.ImageTemplate) error
 }
 
 var (
@@ -42,8 +27,8 @@ var (
 )
 
 // Register makes a Provider available under its Name().
-func Register(p Provider) {
-	providers[p.Name()] = p
+func Register(p Provider, dist, arch string) {
+	providers[p.Name(dist, arch)] = p
 }
 
 // Get returns the Provider by name.

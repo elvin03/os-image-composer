@@ -11,7 +11,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/open-edge-platform/image-composer/internal/provider"
+	"github.com/open-edge-platform/image-composer/internal/ospackage"
 	"github.com/open-edge-platform/image-composer/internal/utils/logger"
 )
 
@@ -33,7 +33,7 @@ func extractBaseRequirement(req string) string {
 	return strings.TrimSuffix(base, "()(64bit)")
 }
 
-func GenerateDot(pkgs []provider.PackageInfo, file string) error {
+func GenerateDot(pkgs []ospackage.PackageInfo, file string) error {
 	log := logger.Logger()
 	log.Infof("Generating DOT file %s", file)
 
@@ -62,14 +62,14 @@ func GenerateDot(pkgs []provider.PackageInfo, file string) error {
 // matched) and the full list of all PackageInfos from the repo, and
 // returns the minimal closure of PackageInfos needed to satisfy all Requires.
 func ResolvePackageInfos(
-	requested []provider.PackageInfo,
-	all []provider.PackageInfo,
-) ([]provider.PackageInfo, error) {
+	requested []ospackage.PackageInfo,
+	all []ospackage.PackageInfo,
+) ([]ospackage.PackageInfo, error) {
 
 	// Build helper maps:
-	byName := make(map[string]provider.PackageInfo, len(all))
-	provides := make(map[string][]string)
-	requires := make(map[string][]string)
+	byName := make(map[string]ospackage.PackageInfo, len(all))
+	provides := make(map[string][]string) // cap -> pkgNames
+	requires := make(map[string][]string) // pkgName -> caps
 
 	for _, pi := range all {
 		byName[pi.Name] = pi
@@ -124,13 +124,14 @@ func ResolvePackageInfos(
 		}
 	}
 
-	result := make([]provider.PackageInfo, 0, len(neededSet))
+	// Build the result slice in deterministic order:
+	result := make([]ospackage.PackageInfo, 0, len(neededSet))
 	for name := range neededSet {
 		// Get the original package info.
 		originalPI := byName[name]
 
 		// Create a new PackageInfo to hold the cleaned data.
-		cleanedPI := provider.PackageInfo{
+		cleanedPI := ospackage.PackageInfo{
 			Name:     originalPI.Name,
 			URL:      originalPI.URL,
 			Checksum: originalPI.Checksum,
@@ -176,7 +177,7 @@ func ResolvePackageInfos(
 }
 
 // ParsePrimary parses the repodata/primary.xml.gz file from a given base URL.
-func ParsePrimary(baseURL, gzHref string) ([]provider.PackageInfo, error) {
+func ParsePrimary(baseURL, gzHref string) ([]ospackage.PackageInfo, error) {
 
 	resp, err := http.Get(baseURL + gzHref)
 	if err != nil {
@@ -192,9 +193,9 @@ func ParsePrimary(baseURL, gzHref string) ([]provider.PackageInfo, error) {
 	dec := xml.NewDecoder(gr)
 
 	var (
-		infos          []provider.PackageInfo
+		infos          []ospackage.PackageInfo
 		currentSection string // "provides", "requires", or ""
-		curInfo        *provider.PackageInfo
+		curInfo        *ospackage.PackageInfo
 	)
 
 	for {
@@ -210,7 +211,7 @@ func ParsePrimary(baseURL, gzHref string) ([]provider.PackageInfo, error) {
 			switch elem.Name.Local {
 			case "package":
 				// start a new PackageInfo
-				curInfo = &provider.PackageInfo{}
+				curInfo = &ospackage.PackageInfo{}
 
 			case "location":
 				// read the href and build full URL + infer Name
