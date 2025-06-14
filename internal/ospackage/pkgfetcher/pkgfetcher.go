@@ -31,6 +31,7 @@ func FetchPackages(urls []string, destDir string, workers int) error {
 		progressbar.OptionShowCount(),
 		progressbar.OptionThrottle(200*time.Millisecond),
 		progressbar.OptionSpinnerType(10),
+		progressbar.OptionClearOnFinish(),
 		progressbar.OptionSetTheme(progressbar.Theme{
 			Saucer:        "[green]=[reset]",
 			SaucerHead:    "[green]>[reset]",
@@ -63,7 +64,7 @@ func FetchPackages(urls []string, destDir string, workers int) error {
 				destPath := filepath.Join(destDir, name)
 				if fi, err := os.Stat(destPath); err == nil {
 					if fi.Size() > 0 {
-						log.Debugf("skipping existing %s", name)
+						//log.Debugf("skipping existing %s", name)
 						if err := bar.Add(1); err != nil {
 							log.Errorf("failed to add to progress bar: %v", err)
 						}

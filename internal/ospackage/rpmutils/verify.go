@@ -39,6 +39,7 @@ func VerifyAll(paths []string, pubkeyPath string, workers int) []Result {
 		progressbar.OptionSetWidth(30),
 		progressbar.OptionThrottle(200*time.Millisecond),
 		progressbar.OptionSpinnerType(10),
+		progressbar.OptionClearOnFinish(),
 		progressbar.OptionSetTheme(progressbar.Theme{
 			Saucer:        "[green]=[reset]",
 			SaucerHead:    "[green]>[reset]",
