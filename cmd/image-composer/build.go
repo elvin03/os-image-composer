@@ -5,6 +5,7 @@ import (
 
 	"github.com/open-edge-platform/image-composer/internal/config"
 	"github.com/open-edge-platform/image-composer/internal/ospackage/pkgfetcher"
+	"github.com/open-edge-platform/image-composer/internal/ospackage/pkgsorter"
 	"github.com/open-edge-platform/image-composer/internal/ospackage/rpmutils"
 	"github.com/open-edge-platform/image-composer/internal/provider"
 	_ "github.com/open-edge-platform/image-composer/internal/provider/azurelinux3" // register provider
@@ -122,6 +123,12 @@ func executeBuild(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("resolving packages: %v", err)
 	}
 	log.Infof("resolved %d packages", len(needed))
+
+	sorted_pkgs, err := pkgsorter.SortPackages(needed)
+	if err != nil {
+		log.Errorf("sorting packages: %v", err)
+	}
+	log.Infof("sorted %d packages for installation", len(sorted_pkgs))
 
 	// If a dot file is specified, generate the dependency graph
 	if dotFile != "" {

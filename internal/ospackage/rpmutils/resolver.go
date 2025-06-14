@@ -8,61 +8,29 @@ import (
 	"net/http"
 	"os"
 	"path"
-	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/open-edge-platform/image-composer/internal/provider"
 	"github.com/open-edge-platform/image-composer/internal/utils/logger"
-
-	"github.com/cavaliergopher/rpm"
 )
 
-// Index maps provided capabilities to RPM paths and RPM paths to their requirements.
-type Index struct {
-	Provides map[string][]string // capability name → []rpm paths
-	Requires map[string][]string // rpm path → []required capability names
-}
-
-// BuildIndex scans all RPM files under dir and builds the Index.
-func BuildIndex(dir string) (*Index, error) {
-
-	idx := &Index{
-		Provides: make(map[string][]string),
-		Requires: make(map[string][]string),
-	}
-
-	pattern := filepath.Join(dir, "*.rpm")
-	rpmFiles, err := filepath.Glob(pattern)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, rpmPath := range rpmFiles {
-		// Open the RPM file
-		pkgFile, err := rpm.Open(rpmPath)
-		if err != nil {
-			return nil, fmt.Errorf("opening RPM %s: %w", rpmPath, err)
+// extractBaseRequirement takes a potentially complex requirement string
+// and returns only the base package/capability name.
+func extractBaseRequirement(req string) string {
+	if strings.HasPrefix(req, "(") && strings.Contains(req, " ") {
+		trimmed := strings.TrimPrefix(req, "(")
+		parts := strings.Fields(trimmed)
+		if len(parts) > 0 {
+			req = parts[0]
 		}
-
-		// Extract capabilities it Provides()
-		provDeps := pkgFile.Provides() // []rpm.Dependency
-		for _, dep := range provDeps {
-			name := dep.Name() // call method to get string
-			idx.Provides[name] = append(idx.Provides[name], rpmPath)
-			// log.Debugf("RPM %s provides %s", rpmPath, name)
-		}
-
-		// Extract its Requires()
-		reqDeps := pkgFile.Requires() // []rpm.Dependency
-		reqNames := make([]string, len(reqDeps))
-		for i, dep := range reqDeps {
-			reqNames[i] = dep.Name() // call method
-			// log.Debugf("RPM %s requires %s", rpmPath, reqNames[i])
-		}
-		idx.Requires[rpmPath] = reqNames
 	}
-
-	return idx, nil
+	finalParts := strings.Fields(req)
+	if len(finalParts) == 0 {
+		return ""
+	}
+	base := finalParts[0]
+	return strings.TrimSuffix(base, "()(64bit)")
 }
 
 func GenerateDot(pkgs []provider.PackageInfo, file string) error {
@@ -100,18 +68,32 @@ func ResolvePackageInfos(
 
 	// Build helper maps:
 	byName := make(map[string]provider.PackageInfo, len(all))
-	provides := make(map[string][]string) // cap -> pkgNames
-	requires := make(map[string][]string) // pkgName -> caps
+	provides := make(map[string][]string)
+	requires := make(map[string][]string)
 
 	for _, pi := range all {
 		byName[pi.Name] = pi
+		provides[pi.Name] = append(provides[pi.Name], pi.Name)
 		for _, cap := range pi.Provides {
-			provides[cap] = append(provides[cap], pi.Name)
+			baseCap := extractBaseRequirement(cap)
+			if baseCap != "" {
+				provides[baseCap] = append(provides[baseCap], pi.Name)
+			}
+		}
+		for _, file := range pi.Files {
+			provides[file] = append(provides[file], pi.Name)
 		}
 		requires[pi.Name] = append([]string{}, pi.Requires...)
 	}
 
-	// Seed the queue with the user‐requested package names:
+	// bestProvider maps a capability to the single "best" package name that provides it.
+	bestProvider := make(map[string]string, len(provides))
+	for cap, provs := range provides {
+		sort.Strings(provs)
+		bestProvider[cap] = provs[len(provs)-1]
+	}
+
+	// BFS to find the complete set of needed package names.
 	queue := make([]string, 0, len(requested))
 	for _, pi := range requested {
 		if _, ok := byName[pi.Name]; !ok {
@@ -120,16 +102,6 @@ func ResolvePackageInfos(
 		queue = append(queue, pi.Name)
 	}
 
-	// bestProvider maps cap -> the single “best” pkgName
-	bestProvider := make(map[string]string, len(provides))
-	for cap, provs := range provides {
-		// pick the lexically greatest filename;
-		// for real RPM semver we might want to check rpmutils.VersionCompare()
-		sort.Strings(provs)
-		bestProvider[cap] = provs[len(provs)-1]
-	}
-
-	// BFS over the require->provide graph:
 	neededSet := make(map[string]struct{})
 	for len(queue) > 0 {
 		cur := queue[0]
@@ -139,8 +111,12 @@ func ResolvePackageInfos(
 		}
 		neededSet[cur] = struct{}{}
 
-		for _, cap := range requires[cur] {
-			if best, ok := bestProvider[cap]; ok {
+		for _, req := range requires[cur] {
+			baseReq := extractBaseRequirement(req)
+			if baseReq == "" {
+				continue
+			}
+			if best, ok := bestProvider[baseReq]; ok {
 				if _, seen := neededSet[best]; !seen {
 					queue = append(queue, best)
 				}
@@ -148,11 +124,51 @@ func ResolvePackageInfos(
 		}
 	}
 
-	// Build the result slice in deterministic order:
 	result := make([]provider.PackageInfo, 0, len(neededSet))
 	for name := range neededSet {
-		result = append(result, byName[name])
+		// Get the original package info.
+		originalPI := byName[name]
+
+		// Create a new PackageInfo to hold the cleaned data.
+		cleanedPI := provider.PackageInfo{
+			Name:     originalPI.Name,
+			URL:      originalPI.URL,
+			Checksum: originalPI.Checksum,
+			Provides: originalPI.Provides,
+			Files:    originalPI.Files,
+			Requires: []string{}, // Start with an empty requires list.
+		}
+
+		// For each original requirement, find the concrete package that satisfies it
+		// and add that package's name to the cleaned list.
+		for _, req := range originalPI.Requires {
+			baseReq := extractBaseRequirement(req)
+			if baseReq == "" {
+				continue
+			}
+
+			if providerName, ok := bestProvider[baseReq]; ok {
+				// Only add if it's a different package to avoid self-dependencies
+				if providerName != cleanedPI.Name {
+					cleanedPI.Requires = append(cleanedPI.Requires, providerName)
+				}
+			}
+		}
+
+		// Deduplicate the cleaned requires list.
+		reqSet := make(map[string]struct{})
+		dedupedReqs := []string{}
+		for _, r := range cleanedPI.Requires {
+			if _, seen := reqSet[r]; !seen {
+				reqSet[r] = struct{}{}
+				dedupedReqs = append(dedupedReqs, r)
+			}
+		}
+		cleanedPI.Requires = dedupedReqs
+
+		result = append(result, cleanedPI)
 	}
+	// Sort the final result for deterministic output.
 	sort.Slice(result, func(i, j int) bool {
 		return result[i].Name < result[j].Name
 	})
@@ -205,7 +221,14 @@ func ParsePrimary(baseURL, gzHref string) ([]provider.PackageInfo, error) {
 						break
 					}
 				}
-
+			case "name":
+				// Read the canonical package name
+				tok2, err2 := dec.Token()
+				if err2 == nil {
+					if charData, ok := tok2.(xml.CharData); ok && curInfo != nil {
+						curInfo.Name = string(charData)
+					}
+				}
 			case "checksum":
 				// grab the checksum text
 				tok2, err2 := dec.Token()
@@ -232,6 +255,14 @@ func ParsePrimary(baseURL, gzHref string) ([]provider.PackageInfo, error) {
 					curInfo.Provides = append(curInfo.Provides, name)
 				} else if currentSection == "requires" {
 					curInfo.Requires = append(curInfo.Requires, name)
+				}
+			case "file":
+				// Grab the file path provided by the package
+				tok2, err2 := dec.Token()
+				if err2 == nil {
+					if charData, ok := tok2.(xml.CharData); ok && curInfo != nil {
+						curInfo.Files = append(curInfo.Files, string(charData))
+					}
 				}
 			}
 

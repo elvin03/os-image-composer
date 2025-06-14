@@ -217,11 +217,6 @@ func (p *AzureLinux3) Resolve(req []provider.PackageInfo, all []provider.Package
 	}
 	log.Infof("need a total of %d RPMs (including dependencies)", len(needed))
 
-	// Simple debug logging - let logger handle level filtering
-	for _, pkg := range needed {
-		log.Debugf("-> %s", pkg.Name)
-	}
-
 	return needed, nil
 }
 

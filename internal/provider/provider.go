@@ -12,6 +12,7 @@ type PackageInfo struct {
 	Checksum string   // optional pre-known digest
 	Provides []string // capabilities this package provides (rpm:entry names)
 	Requires []string // capabilities this package requires
+	Files    []string // list of files in this package (rpm:files)
 }
 
 // Provider is the interface every OSV plugin must implement.
