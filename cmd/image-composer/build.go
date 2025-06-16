@@ -4,13 +4,10 @@ import (
 	"fmt"
 
 	"github.com/open-edge-platform/image-composer/internal/config"
-	"github.com/open-edge-platform/image-composer/internal/ospackage/pkgfetcher"
-	"github.com/open-edge-platform/image-composer/internal/ospackage/pkgsorter"
-	"github.com/open-edge-platform/image-composer/internal/ospackage/rpmutils"
 	"github.com/open-edge-platform/image-composer/internal/provider"
-	_ "github.com/open-edge-platform/image-composer/internal/provider/azurelinux3" // register provider
-	_ "github.com/open-edge-platform/image-composer/internal/provider/elxr12"      // register provider
-	_ "github.com/open-edge-platform/image-composer/internal/provider/emt3_0"      // register provider
+	"github.com/open-edge-platform/image-composer/internal/provider/azl"
+	"github.com/open-edge-platform/image-composer/internal/provider/elxr"
+	"github.com/open-edge-platform/image-composer/internal/provider/emt"
 	"github.com/open-edge-platform/image-composer/internal/utils/logger"
 	"github.com/spf13/cobra"
 )
@@ -83,96 +80,48 @@ func executeBuild(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("loading template file: %v", err)
 	}
 
-	providerName := template.GetProviderName()
-	if providerName == "" {
-		return fmt.Errorf("no provider found for OS %s with distribution %s", template.Target.OS, template.Target.Dist)
-	}
-
-	// Get provider by name
-	p, ok := provider.Get(providerName)
-	if !ok {
-		return fmt.Errorf("provider not found: %s", providerName)
-	}
-
-	// Initialize provider with the template
-	if err := p.Init(template); err != nil {
-		return fmt.Errorf("provider init: %v", err)
-	}
-
-	// Fetch the entire package list
-	all, err := p.Packages()
+	p, err := InitProvider(config.TargetOs, config.TargetDist, config.TargetArch)
 	if err != nil {
-		return fmt.Errorf("getting packages: %v", err)
+		return fmt.Errorf("initializing provider failed: %v", err)
 	}
 
-	// Match the packages in the template against all the packages
-	req, err := p.MatchRequested(template.GetPackages(), all)
-	if err != nil {
-		return fmt.Errorf("matching packages: %v", err)
-	}
-	log.Infof("matched a total of %d packages", len(req))
-	if verbose {
-		for _, pkg := range req {
-			log.Infof("-> %s", pkg.Name)
-		}
+	if err := p.PreProcess(template); err != nil {
+		return fmt.Errorf("pre-processing failed: %v", err)
 	}
 
-	// Resolve the dependencies of the requested packages
-	needed, err := p.Resolve(req, all)
-	if err != nil {
-		return fmt.Errorf("resolving packages: %v", err)
-	}
-	log.Infof("resolved %d packages", len(needed))
-
-	sorted_pkgs, err := pkgsorter.SortPackages(needed)
-	if err != nil {
-		log.Errorf("sorting packages: %v", err)
-	}
-	log.Infof("sorted %d packages for installation", len(sorted_pkgs))
-
-	// If a dot file is specified, generate the dependency graph
-	if dotFile != "" {
-		if err := rpmutils.GenerateDot(needed, dotFile); err != nil {
-			log.Errorf("generating dot file: %v", err)
-		}
+	if err := p.BuildImage(template); err != nil {
+		return fmt.Errorf("image build failed: %v", err)
 	}
 
-	// Extract URLs
-	urls := make([]string, len(needed))
-	for i, pkg := range needed {
-		urls[i] = pkg.URL
-	}
-
-	// Ensure cache directory exists using global config functions
-	if err := config.EnsureCacheDir(); err != nil {
-		return fmt.Errorf("creating cache directory: %v", err)
-	}
-
-	// Ensure work directory exists using global config functions
-	if err := config.EnsureWorkDir(); err != nil {
-		return fmt.Errorf("creating work directory: %v", err)
-	}
-
-	// Get cache directory from global config
-	absCacheDir, err := config.CacheDir()
-	if err != nil {
-		return fmt.Errorf("resolving cache directory: %v", err)
-	}
-
-	// Download packages using configured workers and cache directory
-	log.Infof("downloading %d packages to %s using %d workers", len(urls), absCacheDir, config.Workers())
-	if err := pkgfetcher.FetchPackages(urls, absCacheDir, config.Workers()); err != nil {
-		return fmt.Errorf("fetch failed: %v", err)
-	}
-	log.Info("all downloads complete")
-
-	// Verify downloaded packages
-	if err := p.Validate(absCacheDir); err != nil {
-		return fmt.Errorf("verification failed: %v", err)
+	if err := p.PostProcess(template); err != nil {
+		return fmt.Errorf("post-processing failed: %v", err)
 	}
 
 	log.Info("build completed successfully")
 	return nil
+}
+
+func InitProvider(os, dist, arch string) (provider.Provider, error) {
+
+	var p provider.Provider
+	switch os {
+	case "azure-linux":
+		azl.Register(dist, arch)
+		config.ProviderId = azl.GetProviderId(dist, arch)
+	case "edge-microvisor-toolkit":
+		emt.Register(dist, arch)
+		config.ProviderId = emt.GetProviderId(dist, arch)
+	case "elxr":
+		elxr.Register(dist, arch)
+		config.ProviderId = elxr.GetProviderId(dist, arch)
+	default:
+		return nil, fmt.Errorf("unsupported provider: %s", os)
+	}
+	p, ok := provider.Get(config.ProviderId)
+	if !ok {
+		return nil, fmt.Errorf("provider not found for %s %s %s", os, dist, arch)
+	}
+	return p, p.Init(dist, arch)
 }
 
 // templateFileCompletion helps with suggesting YAML files for template file argument
