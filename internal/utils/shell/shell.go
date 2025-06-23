@@ -288,7 +288,7 @@ func ExecCmdWithStream(cmdStr string, sudo bool, chrootPath string, envVal []str
 			str := scanner.Text()
 			if str != "" {
 				outputStr += str
-				log.Infof(str)
+				log.Debugf(str)
 			}
 		}
 	}()
@@ -299,7 +299,7 @@ func ExecCmdWithStream(cmdStr string, sudo bool, chrootPath string, envVal []str
 		for scanner.Scan() {
 			str := scanner.Text()
 			if str != "" {
-				log.Infof(str)
+				log.Debugf(str)
 			}
 		}
 	}()
