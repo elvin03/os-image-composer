@@ -8,7 +8,6 @@ import (
 
 	"github.com/open-edge-platform/image-composer/internal/utils/file"
 	"github.com/open-edge-platform/image-composer/internal/utils/logger"
-	"gopkg.in/yaml.v3"
 )
 
 // DefaultConfigLoader handles loading and merging default configurations
@@ -283,18 +282,4 @@ func LoadAndMergeTemplate(templatePath string) (*ImageTemplate, error) {
 		len(mergedTemplate.SystemConfigs), len(mergedTemplate.DiskConfigs))
 
 	return mergedTemplate, nil
-}
-
-// SaveMergedTemplate saves the merged template to a file for debugging/inspection
-func SaveMergedTemplate(template *ImageTemplate, outputPath string) error {
-	data, err := yaml.Marshal(template)
-	if err != nil {
-		return fmt.Errorf("failed to marshal template: %w", err)
-	}
-
-	if err := os.WriteFile(outputPath, data, 0644); err != nil {
-		return fmt.Errorf("failed to write template file: %w", err)
-	}
-
-	return nil
 }
