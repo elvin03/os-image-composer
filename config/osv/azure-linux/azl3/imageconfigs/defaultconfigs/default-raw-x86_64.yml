@@ -54,8 +54,6 @@ systemConfigs:
       - dbus
       - dracut-hostonly
       - e2fsprogs
-      - grub2
-      - grub2-efi-binary
       - iana-etc
       - iproute
       - iputils
@@ -69,6 +67,7 @@ systemConfigs:
       - shim
       - sudo
       - systemd
+      - systemd-boot
       - systemd-networkd
       - systemd-resolved
       - systemd-ukify
