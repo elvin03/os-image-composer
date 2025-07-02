@@ -63,7 +63,7 @@ func getChrootEnvPackageList(chrootEnvCongfigPath string) ([]string, error) {
 
 func downloadChrootEnvPackages(targetOs string, targetDist string, targetArch string) ([]string, error) {
 	var allPkgsList []string
-	if targetOs == "azure-linux" {
+	if targetOs == "azure-linux" || targetOs == "edge-microvisor-toolkit" {
 		targetOsConfigDir, err := file.GetTargetOsConfigDir(targetOs, targetDist)
 		if err != nil {
 			return allPkgsList, fmt.Errorf("failed to get target OS config directory: %v", err)
