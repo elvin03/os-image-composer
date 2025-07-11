@@ -588,12 +588,12 @@ func createUser(installRoot string, template *config.ImageTemplate) error {
 	// Create the user with useradd command
 	// -m creates home directory, -s sets shell
 	cmd := fmt.Sprintf("useradd -m -s /bin/bash %s", user)
-	output, err := shell.ExecCmd(cmd, true, installRoot, nil)
+	output, err := shell.ExecCmdSilent(cmd, true, installRoot, nil)
 	if err != nil {
 		if strings.Contains(output, "already exists") {
 			log.Warnf("User %s already exists", user)
 		} else {
-			return fmt.Errorf("failed to create user %s: %w", user, err)
+			return fmt.Errorf("failed to create user %s: output: %s, err: %w", user, output, err)
 		}
 	}
 
