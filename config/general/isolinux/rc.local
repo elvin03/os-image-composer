@@ -1,0 +1,13 @@
+#!/bin/sh
+# Custom rc.local script for ISO boot
+
+# Mount the ISO to access its content
+mkdir -p /cdrom
+mount -t iso9660 /dev/sr0 /cdrom || echo "Failed to mount ISO"
+
+# Print welcome message
+echo "Welcome to the bootable ISO environment!"
+echo "System boot completed successfully."
+
+# Return success
+exit 0
