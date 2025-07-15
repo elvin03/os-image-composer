@@ -9,7 +9,7 @@ target:
   imageType: raw # Image type, valid value: [raw, iso].
 
 disk:
-  name: Default # 1:1 mapping to the systemConfigs name
+  name: Default_Raw # 1:1 mapping to the systemConfigs name
   artifacts:
     -
       type: raw  # image file format
@@ -44,7 +44,7 @@ disk:
       mountPoint: /opt
 
 systemConfig:
-  name: Default
+  name: Default_Raw
   description: Default yml configuration for raw image
 
   bootloader:
