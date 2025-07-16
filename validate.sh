@@ -5,7 +5,7 @@ echo "Current working dir: $(pwd)"
 
 
 run_qemu_boot_test() {
-  cd tmp/image-composer/azure-linux-azl3-x86_64/imagebuild/Default
+  
   IMAGE="azl3-default-x86_64.raw"  # image file
   BIOS="/usr/share/OVMF/OVMF_CODE.fd"
   TIMEOUT=30
@@ -14,7 +14,7 @@ run_qemu_boot_test() {
   ORIGINAL_IMAGE="azl3-default-x86_64.raw"
   COPY_IMAGE="/tmp/azl3-test.raw"
 
-
+  cd tmp/image-composer/azure-linux-azl3-x86_64/imagebuild/Default
   echo "Booting image: $IMAGE "
   echo "Current working dir: $(pwd)"
   
