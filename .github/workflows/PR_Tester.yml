@@ -20,8 +20,8 @@ jobs:
 
       - name: Copy tester script
         run: |
-          if [ ! -f build-tester.sh ]; then
-            echo "build-tester.sh not found!"
+          if [ ! -f validate.sh ]; then
+            echo "validate.sh not found!"
             exit 1
           fi
           chmod +x build-tester.sh
