@@ -74,10 +74,13 @@ if echo "$output" | grep -q "image build completed successfully"; then
   
   if run_qemu_boot_test; then
     echo "QEMU boot test PASSED"
+    exit 0
   else
     echo "QEMU boot test FAILED"
+    exit 1
   fi
 
 else
   echo "Build did not complete successfully. Skipping QEMU test."
+  exit 1
 fi
