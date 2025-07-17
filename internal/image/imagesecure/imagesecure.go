@@ -38,8 +38,8 @@ func ConfigImageSecurity(installRoot string, template *config.ImageTemplate) err
 		return nil
 	}
 
-	// Mounting overlay for read write directories
-	if err := configOverlay(installRoot, template); err != nil {
+	//Mounting overlay for read write directories
+	if err := configOverlay(installRoot); err != nil {
 		return fmt.Errorf("failed to configure overlay: %w", err)
 	}
 
@@ -47,24 +47,30 @@ func ConfigImageSecurity(installRoot string, template *config.ImageTemplate) err
 	return nil
 }
 
-func configOverlay(installRoot string, template *config.ImageTemplate) error {
+func configOverlay(installRoot string) error {
 
 	log := logger.Logger()
 	log.Debugf("Configuring overlay for read-only root filesystem is not implemented yet")
 
-	ovlyDir, err := prepareOverlayDir(installRoot)
+	overlayDirs := []string{
+		"/etc",
+		"/home",
+		"/var",
+	}
+
+	ovlyDir, err := prepareOverlayDir(installRoot, overlayDirs)
 	if err != nil {
 		return fmt.Errorf("failed to prepare ESP directory: %w", err)
 	}
 	log.Debugf("Succesfully Creating Overlay Path:", ovlyDir)
 
-	err = updateImageFstab(installRoot)
+	err = updateImageFstab(installRoot, overlayDirs)
 	if err != nil {
 		return fmt.Errorf("failed to update fstab: %w", err)
 	}
 	log.Debugf("Succesfully Updating fstab for overlay")
 
-	err = createOverlayMntSvc(installRoot)
+	err = createOverlayMntSvc(installRoot, overlayDirs)
 	if err != nil {
 		return fmt.Errorf("failed to create overlay mounting service: %w", err)
 	}
@@ -73,7 +79,7 @@ func configOverlay(installRoot string, template *config.ImageTemplate) error {
 	return nil
 }
 
-func createOverlayMntSvc(installRoot string) error {
+func createOverlayMntSvc(installRoot string, overlayDirs []string) error {
 	log := logger.Logger()
 
 	scriptLines := []string{
@@ -96,8 +102,28 @@ func createOverlayMntSvc(installRoot string) error {
 		"mount -t overlay overlay -o lowerdir=/ro/etc,upperdir=/opt/overlay/etc/upper,workdir=/opt/overlay/etc/work /etc",
 		"",
 		"# Bind-mount persistent /var and /home",
-		"mount --bind /opt/var /var",
-		"mount --bind /opt/home /home",
+		// "mount --bind /opt/var /var",
+		// "mount --bind /opt/home /home",
+	}
+	//adding overlay directories to the list
+	for _, dir := range overlayDirs {
+		if dir == "/etc" {
+			continue // handle /etc separately
+		}
+		// Remove leading slash for opt subdir
+		base := strings.TrimPrefix(dir, "/")
+		mntLn := "mount --bind /opt/" + base + " " + dir
+		// Check if overlayDir is already in dirs
+		exists := false
+		for _, d := range scriptLines {
+			if d == mntLn {
+				exists = true
+				break
+			}
+		}
+		if !exists {
+			scriptLines = append(scriptLines, mntLn)
+		}
 	}
 	scriptContent := strings.Join(scriptLines, "\n") + "\n"
 
@@ -144,16 +170,37 @@ func createOverlayMntSvc(installRoot string) error {
 	return nil
 }
 
-func updateImageFstab(installRoot string) error {
+func updateImageFstab(installRoot string, overlayDirs []string) error {
 	log := logger.Logger()
 
 	lines := []string{
 		"", // An empty string for the blank line
-		"/opt/var /var none bind 0 0",
-		"/opt/home /home none bind 0 0",
+		// "/opt/var /var none bind 0 0",
+		// "/opt/home /home none bind 0 0",
 		"", // An empty string for the blank line
 		"tmpfs /tmp tmpfs mode=1777,nosuid,nodev 0 0",
 		"tmpfs /run tmpfs mode=0755,nosuid,nodev 0 0",
+	}
+
+	//adding overlay directories to the list
+	for _, dir := range overlayDirs {
+		if dir == "/etc" {
+			continue // handle /etc separately
+		}
+		// Remove leading slash for opt subdir
+		base := strings.TrimPrefix(dir, "/")
+		overlayDir := "/opt/" + base + " " + dir + " none bind 0 0"
+		// Check if overlayDir is already in dirs
+		exists := false
+		for _, d := range lines {
+			if d == overlayDir {
+				exists = true
+				break
+			}
+		}
+		if !exists {
+			lines = append(lines, overlayDir)
+		}
 	}
 	contentToAppend := strings.Join(lines, "\n") + "\n" // Add a final newline if needed
 
@@ -167,14 +214,36 @@ func updateImageFstab(installRoot string) error {
 	return nil
 }
 
-func prepareOverlayDir(installRoot string) (string, error) {
+func prepareOverlayDir(installRoot string, overlayDirs []string) (string, error) {
+
 	dirs := []string{
 		"/opt/overlay/etc/",
 		"/opt/overlay/etc/upper",
 		"/opt/overlay/etc/work",
 		"/ro/etc",
-		"/opt/var",
-		"/opt/home",
+		// "/opt/var",
+		// "/opt/home",
+	}
+
+	//adding overlay directories to the list
+	for _, dir := range overlayDirs {
+		if dir == "/etc" {
+			continue // handle /etc separately
+		}
+		// Remove leading slash for opt subdir
+		base := strings.TrimPrefix(dir, "/")
+		overlayDir := "/opt/" + base
+		// Check if overlayDir is already in dirs
+		exists := false
+		for _, d := range dirs {
+			if d == overlayDir {
+				exists = true
+				break
+			}
+		}
+		if !exists {
+			dirs = append(dirs, overlayDir)
+		}
 	}
 
 	// Create required overlay directories
