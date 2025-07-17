@@ -54,6 +54,7 @@ run_qemu_boot_test() {
       done
       echo "$elapsed"
       kill $qemu_pid
+      cat "'$LOGFILE'"
 
       if grep -q "'$SUCCESS_STRING'" "'$LOGFILE'"; then
         echo "Boot success!"
