@@ -9,15 +9,11 @@ run_qemu_boot_test() {
   TIMEOUT=30
   SUCCESS_STRING="login:"
   LOGFILE="qemu_serial.log"
-  ORIGINAL_IMAGE="azl3-default-x86_64.raw"
-  COPY_IMAGE="/tmp/azl3-default-x86_64.raw"
-  touch '$LOGFILE' && chmod 666 '$LOGFILE'
 
 
   ORIGINAL_DIR=$(pwd)
   echo "Booting image: $IMAGE "
   # Search under the directory and copy the file to /tmp
-  rm -f $COPY_IMAGE
   # Find image path
   FOUND_PATH=$(find . -type f -name "$IMAGE" | head -n 1)
   
@@ -30,14 +26,14 @@ run_qemu_boot_test() {
     exit 1
   fi
 
-  
-
   echo "Current working dir: $(pwd)"
+  touch '$LOGFILE' && chmod 666 '$LOGFILE'
+
   nohup qemu-system-x86_64 \
       -m 2048 \
       -enable-kvm \
       -cpu host \
-      -drive if=none,file="'$COPY_IMAGE'",format=raw,id=nvme0 \
+      -drive if=none,file="'$IMAGE'",format=raw,id=nvme0 \
       -device nvme,drive=nvme0,serial=deadbeef \
       -bios "'$BIOS'" \
       -nographic \
@@ -45,7 +41,6 @@ run_qemu_boot_test() {
       > "'$LOGFILE'" 2>&1 &
 
     qemu_pid=$!
-    cd "$ORIGINAL_DIR"
     echo "QEMU launched as root with PID $qemu_pid"
     echo "Current working dir: $(pwd)"
 
