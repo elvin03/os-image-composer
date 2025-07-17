@@ -26,6 +26,16 @@ run_qemu_boot_test() {
     exit 1
   fi
 
+  if [ -f /usr/share/OVMF/OVMF_CODE.fd ]; then
+    BIOS_PATH="/usr/share/OVMF/OVMF_CODE.fd"
+  elif [ -f /usr/share/ovmf/OVMF_CODE.fd ]; then
+    BIOS_PATH="/usr/share/ovmf/OVMF_CODE.fd"
+  else
+    echo "OVMF BIOS not found. Falling back to legacy BIOS."
+    BIOS_PATH=""
+  fi
+
+
   echo "Booting image: $IMAGE "
   sudo bash -c '
   touch "'$LOGFILE'" && chmod 666 "'$LOGFILE'"
