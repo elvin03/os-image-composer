@@ -51,6 +51,9 @@ systemConfig:
     bootType: efi # (efi or legacy)
     provider: systemd-boot # (grub for efi and legacy mode, or systemd-boot for efi mode)
 
+  immutability:
+    enabled: false # default is false
+
   packages:
     - filesystem
     - kernel
