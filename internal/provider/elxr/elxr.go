@@ -6,6 +6,8 @@ import (
 
 	"github.com/open-edge-platform/image-composer/internal/chroot"
 	"github.com/open-edge-platform/image-composer/internal/config"
+	"github.com/open-edge-platform/image-composer/internal/image/isomaker"
+	"github.com/open-edge-platform/image-composer/internal/image/rawmaker"
 	"github.com/open-edge-platform/image-composer/internal/ospackage/debutils"
 	"github.com/open-edge-platform/image-composer/internal/provider"
 	"github.com/open-edge-platform/image-composer/internal/utils/logger"
@@ -74,10 +76,29 @@ func (p *eLxr) PreProcess(template *config.ImageTemplate) error {
 }
 
 func (p *eLxr) BuildImage(template *config.ImageTemplate) error {
+	if config.TargetImageType == "iso" {
+		err := isomaker.BuildISOImage(template)
+		if err != nil {
+			return fmt.Errorf("failed to build ISO image: %v", err)
+		}
+	} else {
+		err := rawmaker.BuildRawImage(template)
+		if err != nil {
+			return fmt.Errorf("failed to build raw image: %v", err)
+		}
+	}
 	return nil
 }
 
 func (p *eLxr) PostProcess(template *config.ImageTemplate, err error) error {
+	log := logger.Logger()
+	if err != nil {
+		log.Errorf("post-process error: %v", err)
+	}
+
+	if err := chroot.CleanupChrootEnv(config.TargetOs, config.TargetDist, config.TargetArch); err != nil {
+		return fmt.Errorf("failed to cleanup chroot environment: %v", err)
+	}
 	return nil
 }
 

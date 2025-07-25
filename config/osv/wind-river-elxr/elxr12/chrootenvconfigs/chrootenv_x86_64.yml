@@ -1,54 +1,29 @@
-packages:
-  # Essential packages
+essential:
+  - dpkg
+  - apt
+  - debianutils
+  - init-system-helpers
+  - dash
+  - mount
+  - sysvinit-utils
+  - gzip
+  - bash
+  - util-linux
+  - tar
   - base-files
   - base-passwd
-  - bash
-  - dash
-  - dpkg
-  - libc-bin
-  # Required packages
+  - sed
+  - bsdutils
   - coreutils
-  - debianutils
-  - diffutils
-  - e2fsprogs
   - findutils
   - grep
-  - gzip
-  - hostname
-  - init
   - login
-  - mount
-  - ncurses-base
-  - ncurses-bin
   - perl-base
-  - sed
-  - tar
-  - util-linux
+  - diffutils
+  - libc-bin
+  - hostname
+  - ncurses-bin
+  - ncurses-base
 
-  - arch-test
+packages:
   - mmdebstrap
-  - bubblewrap
-  - dosfstools
-  - python3-apt
-  - python3-pip
-  - python3-yaml
-  - python3-rich
-  - python3-stevedore
-  - python3-cerberus
-  - python3-click
-  - python3-gi
-  - systemd-container
-  - ostree
-  - libostree-dev
-  - gir1.2-glib-2.0
-  - gir1.2-ostree-1.0
-  - libcairo2-dev
-  - libgirepository1.0-dev
-  - parted
-  - qemu-user-static
-  - fdisk
-  - reprepro
-  - udev
-  - systemd-boot
-  - zip
-  - git

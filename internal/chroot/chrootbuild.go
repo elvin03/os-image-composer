@@ -43,6 +43,28 @@ func getChrootEnvConfig(chrootEnvCongfigPath string) (map[interface{}]interface{
 	return file.ReadFromYaml(chrootEnvCongfigPath)
 }
 
+func GetChrootEnvEssentialPackageList(chrootEnvCongfigPath string) ([]string, error) {
+	pkgList := []string{}
+	chrootEnvConfig, err := getChrootEnvConfig(chrootEnvCongfigPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read chroot environment config: %v", err)
+	}
+	if pkgListRaw, ok := chrootEnvConfig["essential"]; ok {
+		if pkgListStr, ok := pkgListRaw.([]interface{}); ok {
+			for _, pkg := range pkgListStr {
+				if pkgStr, ok := pkg.(string); ok {
+					pkgList = append(pkgList, pkgStr)
+				} else {
+					return nil, fmt.Errorf("invalid package format in chroot environment config: %v", pkg)
+				}
+			}
+		} else {
+			return nil, fmt.Errorf("essential packages field is not a list in chroot environment config")
+		}
+	}
+	return pkgList, nil
+}
+
 func getChrootEnvPackageList(chrootEnvCongfigPath string) ([]string, error) {
 	pkgList := []string{}
 	chrootEnvConfig, err := getChrootEnvConfig(chrootEnvCongfigPath)
@@ -67,7 +89,7 @@ func getChrootEnvPackageList(chrootEnvCongfigPath string) ([]string, error) {
 	return pkgList, nil
 }
 
-func getTaRgetOsPkgType(targetOs string) string {
+func GetTaRgetOsPkgType(targetOs string) string {
 	switch targetOs {
 	case "azure-linux":
 		return "rpm"
@@ -96,16 +118,21 @@ func downloadChrootEnvPackages(targetOs string, targetDist string, targetArch st
 	var pkgsList []string
 	var allPkgsList []string
 
-	pkgType := getTaRgetOsPkgType(targetOs)
+	pkgType := GetTaRgetOsPkgType(targetOs)
 	chrootConfigDir, err := GetChrootConfigDir(targetOs, targetDist)
 	if err != nil {
 		return pkgsList, allPkgsList, fmt.Errorf("failed to get chroot config directory: %v", err)
 	}
 	chrootEnvCongfigPath := filepath.Join(chrootConfigDir, "chrootenv_"+targetArch+".yml")
+	essentialPkgsList, err := GetChrootEnvEssentialPackageList(chrootEnvCongfigPath)
+	if err != nil {
+		return pkgsList, allPkgsList, fmt.Errorf("failed to get essential packages list: %v", err)
+	}
 	pkgsList, err = getChrootEnvPackageList(chrootEnvCongfigPath)
 	if err != nil {
 		return pkgsList, allPkgsList, fmt.Errorf("failed to get chroot environment package list: %v", err)
 	}
+	pkgsList = append(essentialPkgsList, pkgsList...)
 
 	if _, err := os.Stat(ChrootPkgCacheDir); os.IsNotExist(err) {
 		if err := os.MkdirAll(ChrootPkgCacheDir, 0755); err != nil {
@@ -283,19 +310,6 @@ fail:
 	return err
 }
 
-func createDebLocalRepo(repoPath, metaDataPath string) error {
-	if _, err := os.Stat(metaDataPath); os.IsNotExist(err) {
-		if err := os.MkdirAll(metaDataPath, 0755); err != nil {
-			return fmt.Errorf("failed to create local debian cache repository: %w", err)
-		}
-	}
-	cmd := fmt.Sprintf("cd %s && sudo dpkg-scanpackages . /dev/null | gzip -9c > %s/Packages.gz", repoPath, metaDataPath)
-	if _, err := shell.ExecCmd(cmd, false, "", nil); err != nil {
-		return fmt.Errorf("failed to create local debian cache repository: %w", err)
-	}
-	return nil
-}
-
 func mountDebLocalRepo(mountPoint string) error {
 	return mount.MountPath(ChrootPkgCacheDir, mountPoint, "--bind")
 }
@@ -313,7 +327,6 @@ func installDebPkg(targetOs, targetDist, chrootEnvPath string, pkgsList []string
 
 	// from local.list
 	repoPath := "/cdrom/cache-repo"
-	metaDataPath := filepath.Join(repoPath, "dists/stable/main/binary-amd64")
 	pkgListStr := strings.Join(pkgsList, ",")
 
 	chrootConfigDir, err := GetChrootConfigDir(targetOs, targetDist)
@@ -330,20 +343,23 @@ func installDebPkg(targetOs, targetDist, chrootEnvPath string, pkgsList []string
 		return fmt.Errorf("failed to mount debian local repository: %v", err)
 	}
 
-	if err = createDebLocalRepo(repoPath, metaDataPath); err != nil {
-		err = fmt.Errorf("failed to create debian local repository: %v", err)
-		goto fail
+	if _, err := os.Stat(chrootEnvPath); os.IsNotExist(err) {
+		if err := os.MkdirAll(chrootEnvPath, 0755); err != nil {
+			return fmt.Errorf("failed to create chroot environment directory: %v", err)
+		}
 	}
 
 	cmd = fmt.Sprintf("mmdebstrap "+
 		"--variant=custom "+
+		"--format=directory "+
 		"--aptopt=APT::Authentication::Trusted=true "+
 		"--hook-dir=/usr/share/mmdebstrap/hooks/file-mirror-automount "+
 		"--include=%s "+
+		"--verbose --debug "+
 		"-- bookworm %s %s",
 		pkgListStr, chrootEnvPath, localRepoConfigPath)
 
-	if _, err = shell.ExecCmd(cmd, true, "", nil); err != nil {
+	if _, err = shell.ExecCmdWithStream(cmd, true, "", nil); err != nil {
 		goto fail
 	}
 
@@ -366,7 +382,7 @@ fail:
 
 func BuildChrootEnv(targetOs string, targetDist string, targetArch string) error {
 	log := logger.Logger()
-	pkgType := getTaRgetOsPkgType(targetOs)
+	pkgType := GetTaRgetOsPkgType(targetOs)
 	err := InitChrootBuildSpace(targetOs, targetDist, targetArch)
 	if err != nil {
 		return fmt.Errorf("failed to initialize chroot build space: %v", err)
@@ -390,6 +406,10 @@ func BuildChrootEnv(targetOs string, targetDist string, targetArch string) error
 			return fmt.Errorf("failed to install packages in chroot environment: %v", err)
 		}
 	} else if pkgType == "deb" {
+		if err = UpdateLocalDebRepo(ChrootPkgCacheDir); err != nil {
+			return fmt.Errorf("failed to create debian local repository: %v", err)
+		}
+
 		if err := installDebPkg(targetOs, targetDist, chrootEnvPath, pkgsList); err != nil {
 			return fmt.Errorf("failed to install packages in chroot environment: %v", err)
 		}

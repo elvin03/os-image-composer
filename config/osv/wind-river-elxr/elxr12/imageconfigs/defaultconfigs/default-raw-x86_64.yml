@@ -55,8 +55,6 @@ systemConfig:
     enabled: false # default is false
 
   packages:
-    - systemd-boot
-    - dracut
     - linux-image-amd64
     - ca-certificates
     - vim
@@ -77,6 +75,8 @@ systemConfig:
     - systemd-resolved
     - cloud-guest-utils
     - xterm
+    - dracut
+    - systemd-boot
 
   kernel:
     name: kernel
