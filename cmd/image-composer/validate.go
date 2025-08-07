@@ -11,7 +11,6 @@ import (
 // Validate command flags
 var (
 	validateMerged bool = false // Whether to validate after merging with defaults
-	schemaOnly     bool = false // Only validate schema without filesystem checks
 )
 
 // createValidateCommand creates the validate subcommand
@@ -31,8 +30,6 @@ Use --merged to validate the template after merging with defaults.`,
 	// Add flags
 	validateCmd.Flags().BoolVar(&validateMerged, "merged", false,
 		"Validate the template after merging with defaults")
-	validateCmd.Flags().BoolVar(&schemaOnly, "schema-only", false,
-		"Only validate YAML schema without checking filesystem dependencies")
 
 	return validateCmd
 }
@@ -97,10 +94,6 @@ func executeValidate(cmd *cobra.Command, args []string) error {
 		if template.GetKernel().Version != "" {
 			log.Infof("Kernel: %s", template.GetKernel().Version)
 		}
-	}
-
-	if !schemaOnly {
-		log.Info("Note: Use --schema-only flag to skip filesystem dependency checks")
 	}
 
 	return nil
