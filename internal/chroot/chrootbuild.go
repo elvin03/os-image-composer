@@ -191,7 +191,7 @@ func GetTaRgetOsPkgType(targetOs string) string {
 }
 
 func GetChrootConfigDir(targetOs, targetDist string) (string, error) {
-	targetOsConfigDir, err := file.GetTargetOsConfigDir(targetOs, targetDist)
+	targetOsConfigDir, err := config.GetTargetOsConfigDir(targetOs, targetDist)
 	if err != nil {
 		return "", fmt.Errorf("failed to get target OS config directory: %v", err)
 	}

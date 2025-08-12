@@ -35,40 +35,6 @@ func IsSubPath(base, target string) (bool, error) {
 	return true, nil
 }
 
-// GetRootPath returns the root path of the application
-func GetRootPath() (string, error) {
-
-	dir, err := os.Getwd()
-	if err != nil {
-		return "", fmt.Errorf("failed to get current working directory: %w", err)
-	}
-	return dir, nil
-}
-
-func GetGeneralConfigDir() (string, error) {
-	rootPath, err := GetRootPath()
-	if err != nil {
-		return "", fmt.Errorf("failed to get root path: %w", err)
-	}
-	configDir := filepath.Join(rootPath, "config", "general")
-	if _, err := os.Stat(configDir); os.IsNotExist(err) {
-		return "", fmt.Errorf("general config directory does not exist: %s", configDir)
-	}
-	return configDir, nil
-}
-
-func GetTargetOsConfigDir(targetOs, targetDist string) (string, error) {
-	rootPath, err := GetRootPath()
-	if err != nil {
-		return "", fmt.Errorf("failed to get root path: %w", err)
-	}
-	configDir := filepath.Join(rootPath, "config", "osv", targetOs, targetDist)
-	if _, err := os.Stat(configDir); os.IsNotExist(err) {
-		return "", fmt.Errorf("target OS config directory does not exist: %s", configDir)
-	}
-	return configDir, nil
-}
-
 func ReplacePlaceholdersInFile(placeholder, value, filePath string) error {
 	sedCmd := fmt.Sprintf("sed -i 's|%s|%s|g' %s", placeholder, value, filePath)
 	if _, err := shell.ExecCmd(sedCmd, true, "", nil); err != nil {

@@ -599,7 +599,7 @@ func addImageAdditionalFiles(installRoot string, template *config.ImageTemplate)
 		log.Debug("No additional files to add to the image")
 		return nil
 	}
-	targetOsConfigDir, err := file.GetTargetOsConfigDir(template.Target.OS, template.Target.Dist)
+	targetOsConfigDir, err := config.GetTargetOsConfigDir(template.Target.OS, template.Target.Dist)
 	if err != nil {
 		return fmt.Errorf("failed to get target OS config directory: %w", err)
 	}
