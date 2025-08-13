@@ -224,6 +224,15 @@ func createISO(template *config.ImageTemplate, initrdRootfsPath, initrdFilePath,
 		return fmt.Errorf("failed to create GRUB configuration: %v", err)
 	}
 
+	pkgType := chroot.GetTaRgetOsPkgType(config.TargetOs)
+	switch pkgType {
+	case "deb":
+		// Create standalone grub efi
+		if err := createGrubStandAlone(template, initrdRootfsPath, installRoot, isoEfiPath); err != nil {
+			return fmt.Errorf("failed to create standalone GRUB: %v", err)
+		}
+	}
+
 	efiFatImgPath, err := createEfiFatImage(isoEfiPath, isoImagesPath)
 	if err != nil {
 		return fmt.Errorf("failed to create EFI FAT image: %v", err)
@@ -408,18 +417,17 @@ func copyEfiBootloaderFiles(initrdRootfsPath, isoEfiPath string) error {
 	case "rpm":
 		efiGrubFilesSrc = filepath.Join(initrdRootfsPath, "/boot/efi/EFI/BOOT/grubx64.efi")
 		efiBootFilesSrc = filepath.Join(initrdRootfsPath, "/boot/efi/EFI/BOOT/bootx64.efi")
+
+		if _, err := os.Stat(efiBootFilesSrc); os.IsNotExist(err) {
+			return fmt.Errorf("EFI boot file does not exist: %s", efiBootFilesSrc)
+		}
+		efiBootFilesDest := filepath.Join(isoEfiPath, "BOOTX64.EFI")
+		if err := file.CopyFile(efiBootFilesSrc, efiBootFilesDest, "--preserve=mode", true); err != nil {
+			return fmt.Errorf("failed to copy EFI bootloader files: %v", err)
+		}
+
 	case "deb":
-		efiBootFilesSrc = filepath.Join(initrdRootfsPath, "/usr/lib/grub/x86_64-efi/monolithic/grubx64.efi")
 		efiGrubFilesSrc = filepath.Join(initrdRootfsPath, "/usr/lib/grub/x86_64-efi/monolithic/grubx64.efi")
-	}
-
-	if _, err := os.Stat(efiBootFilesSrc); os.IsNotExist(err) {
-		return fmt.Errorf("EFI boot file does not exist: %s", efiBootFilesSrc)
-	}
-
-	efiBootFilesDest := filepath.Join(isoEfiPath, "BOOTX64.EFI")
-	if err := file.CopyFile(efiBootFilesSrc, efiBootFilesDest, "--preserve=mode", true); err != nil {
-		return fmt.Errorf("failed to copy EFI bootloader files: %v", err)
 	}
 
 	if _, err := os.Stat(efiGrubFilesSrc); os.IsNotExist(err) {
@@ -464,12 +472,59 @@ func createGrubCfg(installRoot, imageName string) error {
 	return nil
 }
 
+func createGrubStandAlone(template *config.ImageTemplate, initrdRootfsPath, installRoot, isoEfiPath string) error {
+	log := logger.Logger()
+	log.Infof("Creating standalone GRUB for EFI boot...")
+
+	target := template.GetTargetInfo()
+	arch := target.Arch
+
+	baseDir := filepath.Join(initrdRootfsPath, "boot", "efi", "EFI", "BOOT")
+	efiBootFilesDest := filepath.Join(baseDir, "bootx64.efi")
+	grubDir := filepath.Join(initrdRootfsPath, "usr", "lib", "grub", "x86_64-efi")
+	grubCfgSrc := filepath.Join(installRoot, "EFI", "BOOT", "grub.cfg")
+	grubModInfoSrc := filepath.Join(grubDir, "modinfo.sh")
+
+	if _, err := shell.ExecCmd("mkdir -p "+baseDir, true, "", nil); err != nil {
+		return fmt.Errorf("failed to create base dir %s: %w", baseDir, err)
+	}
+
+	if _, err := os.Stat(grubModInfoSrc); os.IsNotExist(err) {
+		return fmt.Errorf("grub modinfo file does not exist: %s", grubModInfoSrc)
+	}
+
+	if _, err := os.Stat(grubCfgSrc); os.IsNotExist(err) {
+		return fmt.Errorf("grub cfg file does not exist: %s", grubCfgSrc)
+	}
+
+	grubmkCmd := "grub-mkstandalone"
+	grubmkCmd += fmt.Sprintf(" --directory=%s", grubDir)
+	grubmkCmd += fmt.Sprintf(" --format=%s-efi", arch)
+	grubmkCmd += fmt.Sprintf(" --output=%s", efiBootFilesDest)
+	grubmkCmd += fmt.Sprintf(" \"boot/grub/grub.cfg=%s\"", grubCfgSrc)
+	if _, err := shell.ExecCmd(grubmkCmd, true, "", nil); err != nil {
+		return fmt.Errorf("failed to create standalone efi: %w", err)
+	}
+
+	// check output
+	if _, err := os.Stat(efiBootFilesDest); os.IsNotExist(err) {
+		return fmt.Errorf("EFI boot file does not exist: %s", efiBootFilesDest)
+	}
+
+	efiBootFilesFDest := filepath.Join(isoEfiPath, "BOOTX64.EFI")
+	if err := file.CopyFile(efiBootFilesDest, efiBootFilesFDest, "--preserve=mode", true); err != nil {
+		return fmt.Errorf("failed to copy EFI bootloader files: %v", err)
+	}
+
+	return nil
+}
+
 func createEfiFatImage(isoEfiPath, isoImagesPath string) (string, error) {
 	var err error
 	log := logger.Logger()
 	log.Infof("Creating EFI FAT image for UEFI boot...")
 	efiFatImgPath := filepath.Join(isoImagesPath, "efiboot.img")
-	if err := imagedisc.CreateRawFile(efiFatImgPath, "9MiB"); err != nil {
+	if err := imagedisc.CreateRawFile(efiFatImgPath, "18MiB"); err != nil {
 		return "", fmt.Errorf("failed to create EFI FAT image: %v", err)
 	}
 
