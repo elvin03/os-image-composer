@@ -224,7 +224,7 @@ func createISO(template *config.ImageTemplate, initrdRootfsPath, initrdFilePath,
 		return fmt.Errorf("failed to create GRUB configuration: %v", err)
 	}
 
-	pkgType := chroot.GetTargetOsPkgType(config.TargetOs)
+	pkgType := chroot.GetTaRgetOsPkgType(config.TargetOs)
 	switch pkgType {
 	case "deb":
 		// Create standalone grub efi
@@ -521,6 +521,24 @@ func createGrubStandAlone(template *config.ImageTemplate, initrdRootfsPath, inst
 	}
 
 	return nil
+}
+
+// archToGrubFormat maps a CPU architecture to its GRUB platform name
+func archToGrubFormat(arch string) (string, error) {
+	switch arch {
+	case "x86_64":
+		return "x86_64", nil
+	case "i386":
+		return "i386", nil
+	case "arm64", "aarch64":
+		return "arm64", nil
+	case "arm":
+		return "arm", nil
+	case "riscv64":
+		return "riscv64", nil
+	default:
+		return "", fmt.Errorf("unsupported architecture: %s", arch)
+	}
 }
 
 func createEfiFatImage(isoEfiPath, isoImagesPath string) (string, error) {
