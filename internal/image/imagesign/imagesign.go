@@ -31,13 +31,13 @@ func SignImage(installRoot string, template *config.ImageTemplate) error {
 
 	// Check if the key and certificate files exist
 	if _, err := os.Stat(pbKeyPath); err != nil {
-		return fmt.Errorf("secure boot key file not found: %w", err)
+		return fmt.Errorf("secure boot key file not found at %s: %w", pbKeyPath, err)
 	}
 	if _, err := os.Stat(prKeyPath); err != nil {
-		return fmt.Errorf("secure boot certificate file not found: %w", err)
+		return fmt.Errorf("secure boot certificate file not found at %s: %w", prKeyPath, err)
 	}
 	if _, err := os.Stat(prCerPath); err != nil {
-		return fmt.Errorf("secure boot UEFI certificate file not found: %w", err)
+		return fmt.Errorf("secure boot UEFI certificate file not found at %s: %w", prCerPath, err)
 	}
 
 	espDir := filepath.Join(installRoot, "boot", "efi")

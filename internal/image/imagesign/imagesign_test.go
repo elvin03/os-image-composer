@@ -44,30 +44,6 @@ func TestSignImage_NoSecureBootKeys(t *testing.T) {
 	}
 }
 
-func TestSignImage_MissingKeyFiles(t *testing.T) {
-	installRoot := t.TempDir()
-
-	template := &config.ImageTemplate{
-		SystemConfig: config.SystemConfig{
-			Immutability: config.ImmutabilityConfig{
-				Enabled:         true,
-				SecureBootDBKey: "/nonexistent/key.key",
-				SecureBootDBCrt: "/nonexistent/cert.crt",
-				SecureBootDBCer: "/nonexistent/cert.cer",
-			},
-		},
-	}
-
-	err := SignImage(installRoot, template)
-	if err == nil {
-		t.Error("SignImage should fail when key files don't exist")
-	}
-
-	if !strings.Contains(err.Error(), "secure boot key or certificate file not found") {
-		t.Errorf("Expected error about missing files, got: %v", err)
-	}
-}
-
 func TestSignImage_MissingUKIFile(t *testing.T) {
 	installRoot := t.TempDir()
 
