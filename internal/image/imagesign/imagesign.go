@@ -11,7 +11,7 @@ import (
 
 func SignImage(installRoot string, template *config.ImageTemplate) error {
 
-	//if immutability is not enabled, skip signing
+	// If immutability is not enabled, skip signing
 	if !template.IsImmutabilityEnabled() {
 		return nil
 	}
@@ -24,8 +24,6 @@ func SignImage(installRoot string, template *config.ImageTemplate) error {
 		return nil
 	}
 
-	// pbKeyPath := "/data/secureboot/keys/DB.key"
-	// prKeyPath := "/data/secureboot/keys/DB.crt"
 	pbKeyPath := template.GetSecureBootDBKeyPath()
 	prKeyPath := template.GetSecureBootDBCrtPath()
 	prCerPath := template.GetSecureBootDBCerPath()
@@ -38,7 +36,7 @@ func SignImage(installRoot string, template *config.ImageTemplate) error {
 		return fmt.Errorf("secure boot certificate file not found: %w", err)
 	}
 	if _, err := os.Stat(prCerPath); err != nil {
-		return fmt.Errorf("secure boot cer file not found: %w", err)
+		return fmt.Errorf("secure boot UEFI certificate file not found: %w", err)
 	}
 
 	espDir := filepath.Join(installRoot, "boot", "efi")
