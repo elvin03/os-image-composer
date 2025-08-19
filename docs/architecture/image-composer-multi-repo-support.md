@@ -97,13 +97,12 @@ This simplified priority system ensures users always get the most recent package
 
 #### What are Dependencies?
 
-In simple terms, dependencies are other packages that a software package needs to work properly. Think of it like cooking a recipe - if you want to make a cake, you need ingredients like flour, eggs, and sugar. Similarly, when you install a software package, it often needs other software packages (dependencies) to function correctly.
+In simple terms, dependencies are other packages that a software package needs to work properly. Think of it like cooking a recipe—if you want to make a cake, you need ingredients like flour, eggs, and sugar. Similarly, when you install a software package, it often needs other software packages (dependencies) to function correctly.
 
 **For example:**
 - A web browser might depend on graphics libraries to display images
 - A media player might depend on codec packages to play different video formats
 - A database application might depend on networking libraries to communicate over the internet
-
 
 #### Dependency Resolution in Multi-Repository Environment
 
@@ -116,6 +115,8 @@ ICT automatically resolves dependencies according to the rules below, ensuring p
 2. **Fallback to Base Repository**: If a dependency cannot be resolved within the same repository as the parent package (i.e., not found at all), ICT will attempt to resolve the dependency from the base OS repository.
 
 3. **Conflict Prevention**: This approach prevents version mismatches and compatibility issues that could arise from mixing dependencies across different repositories.
+
+4. **Single Version Enforcement**: If different packages require different versions of the same dependency (e.g., package A needs `libtest=0.1` and package B needs `libtest=0.2`), ICT will fail with an error. Multiple versions of the same dependency cannot be installed in parallel.
 
 #### Dependency Resolution Examples
 
@@ -143,6 +144,12 @@ ICT automatically resolves dependencies according to the rules below, ensuring p
 - `anotherpackage-2.0.0` depends on `unknownlib-3.0.0`
 - `unknownlib-3.0.0` not available in any repository
 - **Result**: ICT reports dependency resolution failure and suggests adding missing package to the relevant repository or using an alternative
+
+##### Example 5: Conflicting dependency versions
+- User specifies: `packageA-1.0.0` (depends on `libtest=0.1`)
+- User also specifies: `packageB-2.0.0` (depends on `libtest=0.2`)
+- **Result**: ICT fails with an error—multiple versions of `libtest` cannot be installed in parallel. User must resolve the conflict by choosing compatible packages.
+- **Alternative Solution**: If both versions of `libtest` are required, users can package each version under a unique package name (e.g., `libtest01` and `libtest02`). This allows both versions to co-exist and satisfy the dependencies for different packages.
 
 #### Benefits of Repository Affinity
 
