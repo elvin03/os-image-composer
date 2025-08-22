@@ -61,34 +61,45 @@ func UserPackages() ([]ospackage.PackageInfo, error) {
 
 	log := logger.Logger()
 	log.Infof("fetching packages from %s", "user package list")
+
 	// Declare a list containing two repo configs
 	repoList := []struct {
-		ID  string
-		URL string
+		id       string
+		codename string
+		url      string
+		pkey     string
 	}{
-		{ID: "testrepo1", URL: "http://localhost:8080"},
-		{ID: "testrepo2", URL: "http://localhost:8081"},
+		{id: "testrepo1", codename: "testrepo1", url: "http://localhost:8080", pkey: "http://localhost:8080/public.gpg.key"},
+		{id: "testrepo2", codename: "testrepo2", url: "http://localhost:8081", pkey: "http://localhost:8081/public.gpg.key"},
+		{id: "openvino", codename: "ubuntu22", url: "https://apt.repos.intel.com/openvino/2024", pkey: "https://repositories.intel.com/graphics/intel-graphics.key"},
 	}
 
 	// baseURL := "http://localhost:8080"
-	pkNm := "public.gpg.key"
+	// pkNm := "public.gpg.key"
+	// wget https://apt.repos.intel.com/openvino/2024/dists/ubuntu22/Release
+	// wget https://apt.repos.intel.com/openvino/2024/dists/ubuntu22/Release.gpg
+	// wget https://apt.repos.intel.com/openvino/2024/dists/ubuntu22/main/binary-amd64/Packages.gz
 
 	var userRepo []RepoConfig
 	// userRepoSpec := []string{"userrepo01"} // Replace with user mutl repo input
+	// wget https://apt.repos.intel.com/openvino/2024/dists/ubuntu22/main/binary-amd64/Packages.gz
+	// wget https://apt.repos.intel.com/openvino/2024/dists/ubuntu22/Release
 
 	for _, repoItem := range repoList {
-		name := repoItem.ID
-		baseURL := repoItem.URL
+		id := repoItem.id
+		codename := repoItem.codename
+		baseURL := repoItem.url
+		pkey := repoItem.pkey
 		repo := RepoConfig{
-			PkgList:      baseURL + "/dists/" + name + "/main/binary-amd64/Packages.gz",
-			ReleaseFile:  fmt.Sprintf("%s/dists/%s/Release", baseURL, name),
-			ReleaseSign:  fmt.Sprintf("%s/dists/%s/Release.gpg", baseURL, name),
+			PkgList:      baseURL + "/dists/" + codename + "/main/binary-amd64/Packages.gz",
+			ReleaseFile:  fmt.Sprintf("%s/dists/%s/Release", baseURL, codename),
+			ReleaseSign:  fmt.Sprintf("%s/dists/%s/Release.gpg", baseURL, codename),
 			PkgPrefix:    baseURL,
-			Name:         name,
+			Name:         id,
 			GPGCheck:     true,
 			RepoGPGCheck: true,
 			Enabled:      true,
-			PbGPGKey:     fmt.Sprintf("%s/%s", baseURL, pkNm),
+			PbGPGKey:     pkey, //fmt.Sprintf("%s/%s", baseURL, pkNm),
 			BuildPath:    "./builds/elxr",
 		}
 		userRepo = append(userRepo, repo)
@@ -98,19 +109,21 @@ func UserPackages() ([]ospackage.PackageInfo, error) {
 	for _, rpItx := range userRepo {
 		userPkgs, err := ParsePrimary(rpItx.PkgPrefix, rpItx.PkgList, rpItx.ReleaseFile, rpItx.ReleaseSign, rpItx.PbGPGKey, rpItx.BuildPath)
 		if err != nil {
-			log.Errorf("parsing user repo failed: %v", err)
+			log.Errorf("parsing user repo failed: %v %s %s", err, rpItx.ReleaseFile, rpItx.ReleaseSign)
 			continue
 		}
 		allUserPackages = append(allUserPackages, userPkgs...)
 	}
 
 	// Print all user packages with their name and URL
+	fmt.Printf("\n\nStart:\n\n")
 	for _, pkg := range allUserPackages {
 		fmt.Printf("Package: %-40s URL: %s\n", pkg.Name, pkg.URL)
 	}
+	fmt.Printf("\n\nEND\n\n")
 
-	return allUserPackages, nil
-	// return nil, fmt.Errorf("yockgen: dummy error for testing")
+	// return allUserPackages, nil
+	return nil, fmt.Errorf("yockgen: dummy error for testing")
 
 }
 
