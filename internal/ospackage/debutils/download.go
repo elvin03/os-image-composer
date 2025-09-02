@@ -97,8 +97,7 @@ func UserPackages() ([]ospackage.PackageInfo, error) {
 			// check if package list exist for each arch
 			package_list_url := baseURL + "/dists/" + codename + "/main/binary-" + arch + "/Packages.gz"
 			if !checkFileExists(package_list_url) {
-				log.Warnf("package list does not exist for arch %s at %s, skipping", arch, package_list_url)
-				continue
+				return nil, fmt.Errorf("package list does not exist for arch %s at %s", arch, package_list_url)
 			}
 			repo := RepoConfig{
 				PkgList:      package_list_url,
@@ -122,8 +121,7 @@ func UserPackages() ([]ospackage.PackageInfo, error) {
 
 		userPkgs, err := ParseRepositoryMetadata(rpItx.PkgPrefix, rpItx.PkgList, rpItx.ReleaseFile, rpItx.ReleaseSign, rpItx.PbGPGKey, rpItx.BuildPath, rpItx.Arch)
 		if err != nil {
-			log.Errorf("parsing user repo failed: %v %s %s", err, rpItx.ReleaseFile, rpItx.ReleaseSign)
-			continue
+			return nil, fmt.Errorf("parsing user repo failed: %v %s %s", err, rpItx.ReleaseFile, rpItx.ReleaseSign)
 		}
 		allUserPackages = append(allUserPackages, userPkgs...)
 	}
