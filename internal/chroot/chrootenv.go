@@ -396,7 +396,7 @@ func CleanDebName(packageName string) string {
 }
 
 func (chrootEnv *ChrootEnv) AptInstallPackage(packageName, installRoot string, repoSrcList []string) error {
-  packageName = CleanDebName(packageName)
+	packageName = CleanDebName(packageName)
 	installCmd := fmt.Sprintf("apt-get install -y %s", packageName)
 
 	if len(repoSrcList) > 0 {
