@@ -584,8 +584,6 @@ func extractRepoBase(rawURL string) (string, error) {
 func extractVersionRequirement(reqVers []string) (op string, ver string, found bool) {
 	for _, reqVer := range reqVers {
 		reqVer = strings.TrimSpace(reqVer)
-		op = ""
-		ver = ""
 
 		// Find version constraint inside parentheses
 		if idx := strings.Index(reqVer, "("); idx != -1 {
@@ -597,8 +595,8 @@ func extractVersionRequirement(reqVers []string) (op string, ver string, found b
 			// Split into operator and version
 			parts := strings.Fields(verConstraint)
 			if len(parts) == 2 {
-				op = parts[0]
-				ver = parts[1]
+				op := parts[0]
+				ver := parts[1]
 				return op, ver, true
 			}
 		}
