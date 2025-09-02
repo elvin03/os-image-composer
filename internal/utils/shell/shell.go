@@ -409,8 +409,6 @@ func (d *DefaultExecutor) ExecCmdWithStream(cmdStr string, sudo bool, chrootPath
 		}
 	}()
 
-	// Collect output immediately in a dedicated goroutine
-	var outputStr strings.Builder
 	go func() {
 		defer wg.Done()
 		defer close(outputChan)
