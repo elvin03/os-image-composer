@@ -228,11 +228,10 @@ func ParseRepositoryMetadata(baseURL string, pkggz string, releaseFile string, r
 	return pkgs, nil
 }
 
-// ResolvePackageInfos takes a seed list of PackageInfos (the exact versions
+// ResolveDependencies takes a seed list of PackageInfos (the exact versions
 // matched) and the full list of all PackageInfos from the repo, and
 // returns the minimal closure of PackageInfos needed to satisfy all Requires.
-func ResolvePackageInfos(requested []ospackage.PackageInfo, all []ospackage.PackageInfo) ([]ospackage.PackageInfo, error) {
-	log := logger.Logger()
+func ResolveDependencies(requested []ospackage.PackageInfo, all []ospackage.PackageInfo) ([]ospackage.PackageInfo, error) {
 	// Build maps for fast lookup
 	byNameVer := make(map[string]ospackage.PackageInfo, len(all))
 	byProvides := make(map[string]ospackage.PackageInfo)
@@ -638,27 +637,18 @@ func CleanDependencyName(dep string) string {
 // compareVersions compares two Debian package versions
 // Returns 1 if v1 > v2, -1 if v1 < v2, 0 if equal
 func compareVersions(v1, v2 string) int {
-
 	// Extract version from Debian package names like "acct_6.6.4-5+b1_amd64.deb"
 	extractVersion := func(name string) string {
-		// Find first underscore, then take everything until the next underscore
 		parts := strings.Split(name, "_")
 		if len(parts) >= 2 {
-			return parts[1] // This is the version part
+			return parts[1]
 		}
 		return name
 	}
-
 	ver1 := extractVersion(v1)
 	ver2 := extractVersion(v2)
-
-	// Simple string comparison works for most cases like "6.6.4-5+b1" vs "7.6.4-5+b1"
-	if ver1 > ver2 {
-		return 1
-	} else if ver1 < ver2 {
-		return -1
-	}
-	return 0
+	cmp, _ := compareDebianVersions(ver1, ver2)
+	return cmp
 }
 
 // ResolvePackage finds the best matching package for a given package name
@@ -740,16 +730,12 @@ func extractRepoBase(rawURL string) (string, error) {
 	return base, nil
 }
 
-func verfiyVersionRequirementMet(reqVers []string, filter string) (op string, ver string, found bool) {
+func extractVersionRequirement(reqVers []string) (op string, ver string, found bool) {
 	for _, reqVer := range reqVers {
 		reqVer = strings.TrimSpace(reqVer)
-		name := reqVer
-		op = ""
-		ver = ""
 
 		// Find version constraint inside parentheses
 		if idx := strings.Index(reqVer, "("); idx != -1 {
-			name = strings.TrimSpace(reqVer[:idx])
 			verConstraint := reqVer[idx+1:]
 			if idx2 := strings.Index(verConstraint, ")"); idx2 != -1 {
 				verConstraint = verConstraint[:idx2]
@@ -758,16 +744,11 @@ func verfiyVersionRequirementMet(reqVers []string, filter string) (op string, ve
 			// Split into operator and version
 			parts := strings.Fields(verConstraint)
 			if len(parts) == 2 {
-				op = parts[0]
-				ver = parts[1]
+				op := parts[0]
+				ver := parts[1]
+				return op, ver, true
 			}
 		}
-
-		// Check if this requirement matches the filter
-		if name == filter {
-			return op, ver, true
-		}
-
 	}
 
 	return "", "", false
@@ -779,13 +760,13 @@ func resolveMultiCandidates(parentPkg ospackage.PackageInfo, candidates []ospack
 	//A: if version is specified
 	/////////////////////////////////////
 
-	op, ver, found := verfiyVersionRequirementMet(parentPkg.RequiresVer, candidates[0].Name)
-	fmt.Printf("verfiyVersionRequirementMet: package=%s op=%s, ver=%s, found=%v\n", candidates[0].Name, op, ver, found)
-
+	op, ver, _ := extractVersionRequirement(parentPkg.RequiresVer)
 	var selectedCandidate ospackage.PackageInfo
 	for _, candidate := range candidates {
 		cmp, err := compareDebianVersions(candidate.Version, ver)
-		fmt.Printf("compareDebianVersions(%q, %q) = %d, err=%v\n", candidate.Version, ver, cmp, err)
+		if err != nil {
+			return ospackage.PackageInfo{}, fmt.Errorf("failed to compare versions for candidate %q: %v", candidate.Name, err)
+		}
 		if cmp == 0 && op == "=" {
 			selectedCandidate = candidate
 			break
