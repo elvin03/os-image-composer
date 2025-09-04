@@ -12,10 +12,14 @@ import (
 )
 
 func Decompress(inFile string, outFile string) ([]string, error) {
-	log := logger.Logger()
 	if filepath.Ext(inFile) == ".xz" {
 		return DecompressXZ(inFile, outFile)
 	}
+	return DecompressGZ(inFile, outFile)
+}
+
+func DecompressGZ(inFile string, outFile string) ([]string, error) {
+	log := logger.Logger()
 
 	gzFile, err := os.Open(inFile)
 	if err != nil {

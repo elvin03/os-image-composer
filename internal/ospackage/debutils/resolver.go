@@ -312,6 +312,13 @@ func ResolveDependencies(requested []ospackage.PackageInfo, all []ospackage.Pack
 			}
 
 			candidates := findAllCandidates(depName, all)
+
+			if len(candidates) > 0 {
+				// if depName == "libpam-systemd" {
+				yockgen("/tmp/yockgen.log", fmt.Sprintf("name: %s, version: %s, url: %v", candidates[0].Name, candidates[0].Version, candidates[0].URL))
+				// return nil, fmt.Errorf("yockgen debug libpam-systemd")
+			}
+
 			if len(candidates) >= 1 {
 				// Pick the candidate using the resolver and add it to the queue
 				chosenCandidate, err := resolveMultiCandidates(cur, candidates)
@@ -765,42 +772,68 @@ func extractVersionRequirement(reqVers []string) (op string, ver string, found b
 }
 
 func resolveMultiCandidates(parentPkg ospackage.PackageInfo, candidates []ospackage.PackageInfo) (ospackage.PackageInfo, error) {
+	parentBase, err := extractRepoBase(parentPkg.URL)
+	if err != nil {
+		return ospackage.PackageInfo{}, fmt.Errorf("failed to extract repo base from parent package URL: %w", err)
+	}
 
 	/////////////////////////////////////
 	//A: if version is specified
 	/////////////////////////////////////
+	op, ver, hasVersionConstraint := extractVersionRequirement(parentPkg.RequiresVer)
+	if hasVersionConstraint {
+		// First pass: look for candidates from the same repo that meet version constraint
+		var sameRepoMatches []ospackage.PackageInfo
+		var otherRepoMatches []ospackage.PackageInfo
 
-	op, ver, _ := extractVersionRequirement(parentPkg.RequiresVer)
-	var selectedCandidate ospackage.PackageInfo
-	for _, candidate := range candidates {
-		cmp, err := compareDebianVersions(candidate.Version, ver)
-		if err != nil {
-			return ospackage.PackageInfo{}, fmt.Errorf("failed to compare versions for candidate %q: %w", candidate.Name, err)
-		}
-		if cmp == 0 && op == "=" {
-			selectedCandidate = candidate
-			break
-		} else if cmp < 0 && (op == "<<" || op == "<") {
-			selectedCandidate = candidate
-			break
-		} else if cmp <= 0 && op == "<=" {
-			selectedCandidate = candidate
-			break
-		} else if cmp > 0 && (op == ">>" || op == ">") {
-			selectedCandidate = candidate
-			break
-		} else if cmp >= 0 && op == ">=" {
-			selectedCandidate = candidate
-			break
-		}
-	}
+		for _, candidate := range candidates {
+			candidateBase, err := extractRepoBase(candidate.URL)
+			if err != nil {
+				continue
+			}
 
-	if selectedCandidate.Name != "" {
-		return selectedCandidate, nil
+			// Check if version constraint is satisfied
+			cmp, err := compareDebianVersions(candidate.Version, ver)
+			if err != nil {
+				continue
+			}
+
+			versionMatches := false
+			switch op {
+			case "=":
+				versionMatches = (cmp == 0)
+			case "<<", "<":
+				versionMatches = (cmp < 0)
+			case "<=":
+				versionMatches = (cmp <= 0)
+			case ">>", ">":
+				versionMatches = (cmp > 0)
+			case ">=":
+				versionMatches = (cmp >= 0)
+			}
+
+			if versionMatches {
+				if candidateBase == parentBase {
+					sameRepoMatches = append(sameRepoMatches, candidate)
+				} else {
+					otherRepoMatches = append(otherRepoMatches, candidate)
+				}
+			}
+		}
+
+		// Priority 1: return first match from same repo
+		if len(sameRepoMatches) > 0 {
+			return sameRepoMatches[0], nil
+		}
+
+		// Priority 2: return first match from other repos
+		if len(otherRepoMatches) > 0 {
+			return otherRepoMatches[0], nil
+		}
 	}
 
 	/////////////////////////////////////
-	// B: if version is not specificied
+	// B: if version is not specified
 	//////////////////////////////////////
 
 	// Check for empty candidates list
@@ -811,11 +844,6 @@ func resolveMultiCandidates(parentPkg ospackage.PackageInfo, candidates []ospack
 	// If only one candidate, return it
 	if len(candidates) == 1 {
 		return candidates[0], nil
-	}
-
-	parentBase, err := extractRepoBase(parentPkg.URL)
-	if err != nil {
-		return ospackage.PackageInfo{}, fmt.Errorf("failed to extract repo base from parent package URL: %w", err)
 	}
 
 	// Rule 1: find all candidates with the same base URL and return the latest version
@@ -848,6 +876,6 @@ func resolveMultiCandidates(parentPkg ospackage.PackageInfo, candidates []ospack
 		return latest, nil
 	}
 
-	// Rule 2: If no candidate has the same repo, return the first candidate in other repos (base repo + )
+	// Rule 2: If no candidate has the same repo, return the first candidate in other repos
 	return candidates[0], nil
 }
