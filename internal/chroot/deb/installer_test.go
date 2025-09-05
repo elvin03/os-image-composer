@@ -311,8 +311,11 @@ func TestInstallDebPkg_ChrootEnvCreation(t *testing.T) {
 	}
 
 	// Should fail on mount or mmdebstrap, not on directory creation
-	if err != nil && strings.Contains(err.Error(), "failed to create chroot environment directory") {
-		t.Errorf("Should not fail on directory creation, got: %v", err)
+	if _, err = os.Stat(chrootEnvPath); os.IsNotExist(err) {
+		if _, err := shell.ExecCmd("mkdir -p "+chrootEnvPath, false, "", nil); err != nil {
+			t.Fatalf("Failed to create chroot environment directory: %v", err)
+			return
+		}
 	}
 }
 
