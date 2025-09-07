@@ -561,7 +561,7 @@ func TestWriteArrayToFile(t *testing.T) {
 				if err == nil {
 					t.Error("Expected error but got none")
 				}
-				if tt.errorContains != "" && !strings.Contains(err.Error(), tt.errorContains) {
+				if tt.errorContains != "" && err != nil && !strings.Contains(err.Error(), tt.errorContains) {
 					t.Errorf("Expected error to contain %q, got: %v", tt.errorContains, err)
 				}
 			} else {
