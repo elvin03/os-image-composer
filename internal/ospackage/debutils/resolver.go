@@ -263,7 +263,7 @@ func ResolveDependencies(requested []ospackage.PackageInfo, all []ospackage.Pack
 				continue
 			}
 			if _, seen := neededSet[depName]; seen {
-				// check if new one can use seen package , if cannot use then error out, else continue
+				// Check if the new package can use the existing package. If it cannot, then error out; otherwise, continue.
 				// get the package from current queue based on name
 				existing := findAllCandidates(depName, queue)
 				if len(existing) > 0 {
@@ -278,7 +278,7 @@ func ResolveDependencies(requested []ospackage.PackageInfo, all []ospackage.Pack
 								break
 							}
 						}
-						return nil, fmt.Errorf("package conflicting dependencies, %s_%s requires %s, but %s_%s is to be installed", cur.Name, cur.Version, requiredVer, existing[0].Name, existing[0].Version)
+						return nil, fmt.Errorf("conflicting package dependencies: %s_%s requires %s, but %s_%s is to be installed", cur.Name, cur.Version, requiredVer, existing[0].Name, existing[0].Version)
 					}
 				}
 				continue
@@ -389,7 +389,10 @@ func compareDebianVersions(a, b string) (int, error) {
 		return s[:i], s[i:], false
 	}
 
-	// Character ordering per Debian: '~' < end-of-string < letters < other characters
+	// Character ordering per Debian: '~' < end-of-string < letters < other characters.
+	// This ordering is crucial for correct Debian version comparison, as defined in
+	// Debian Policy Manual section 5.6.12 ("Version"). See:
+	// https://www.debian.org/doc/debian-policy/ch-controlfields.html#version
 	charOrder := func(r rune) int {
 		if r == '~' {
 			return -2
