@@ -132,7 +132,7 @@ func (p *eLxr) PostProcess(template *config.ImageTemplate, err error) error {
 }
 
 func (p *eLxr) installHostDependency() error {
-	var depedencyInfo = map[string]string{
+	var dependencyInfo = map[string]string{
 		"mmdebstrap":        "mmdebstrap",    // For the chroot env build
 		"mkfs.fat":          "dosfstools",    // For the FAT32 boot partition creation
 		"xorriso":           "xorriso",       // For ISO image creation
@@ -147,7 +147,7 @@ func (p *eLxr) installHostDependency() error {
 		return fmt.Errorf("failed to get host package manager: %w", err)
 	}
 
-	for cmd, pkg := range depedencyInfo {
+	for cmd, pkg := range dependencyInfo {
 		cmdExist, err := shell.IsCommandExist(cmd, "")
 		if err != nil {
 			return fmt.Errorf("failed to check command %s existence: %w", cmd, err)

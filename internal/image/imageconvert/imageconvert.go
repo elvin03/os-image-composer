@@ -25,8 +25,8 @@ func NewImageConvert() *ImageConvert {
 }
 
 func (imageConvert *ImageConvert) ConvertImageFile(filePath string, template *config.ImageTemplate) error {
-	var keepRawImage bool = false
-	var rawImageCompressionType string = ""
+	var keepRawImage bool
+	var rawImageCompressionType string
 
 	if template == nil {
 		return fmt.Errorf("image template is nil")
@@ -98,7 +98,7 @@ func convertImageFile(filePath, imageType string) (string, error) {
 	case "vdi":
 		cmdStr = fmt.Sprintf("qemu-img convert -O vdi %s %s", filePath, outputFilePath)
 	default:
-		log.Error("Unsupported image type: %s", imageType)
+		log.Errorf("Unsupported image type: %s", imageType)
 		return outputFilePath, fmt.Errorf("unsupported image type: %s", imageType)
 	}
 
