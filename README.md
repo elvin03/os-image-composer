@@ -1,9 +1,9 @@
-# Image Composer Tool
+# OS Image Composer tool
 
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![Go Lint Check](https://github.com/open-edge-platform/os-image-composer/actions/workflows/go-lint.yml/badge.svg)](https://github.com/open-edge-platform/os-image-composer/actions/workflows/go-lint.yml)
 
-The Image Composer Tool (ICT) is a toolchain that builds immutable
+The OS Image Composer tool is a toolchain that builds immutable
 Linux distributions using a simple toolchain from pre-built packages provided by different Operating System Vendors (OSVs).
 
 The ICT is developed in the Go programming language (or `golang`) and initially builds custom
@@ -39,7 +39,7 @@ For complete usage instructions, see the [CLI Specification](./docs/architecture
 
 ### Prerequisites
 
-Image Composer Tool is developed in the Go programming language (or `golang`) and requires golang version 1.22.12 and above. See installation instructions for a specific distribution [here](https://go.dev/doc/manage-install).
+OS Image Composer tool is developed in the Go programming language (or `golang`) and requires golang version 1.22.12 and above. See installation instructions for a specific distribution [here](https://go.dev/doc/manage-install).
 
 > **Note:** Before building, check out [docs/tutorial/Pre-requisite](./docs/tutorial/Pre-requisite.md) for instructions to install required binaries.
 
@@ -71,7 +71,7 @@ The Earthly build automatically includes:
 
 ### Global Configuration
 
-Image Composer Tool supports global configuration files for setting tool-level parameters that apply across all image builds. Image-specific parameters are defined in YAML image template files.
+OS Image Composer tool supports global configuration files for setting tool-level parameters that apply across all image builds. Image-specific parameters are defined in YAML image template files.
 
 #### Configuration File Locations
 
@@ -116,7 +116,7 @@ logging:
 
 ### Usage
 
-The Image Composer Tool uses a command-line interface with various commands:
+The OS Image Composer tool uses a command-line interface with various commands:
 
 ```bash
 # Show help
@@ -140,7 +140,7 @@ The Image Composer Tool uses a command-line interface with various commands:
 
 ### Commands
 
-The Image Composer Tool provides the following commands:
+The OS Image Composer tool provides the following commands:
 
 #### build
 
