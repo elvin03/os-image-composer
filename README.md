@@ -518,7 +518,7 @@ systemConfigs:
 ## Contribute
 
 * [Open an issue](https://github.com/open-edge-platform/os-image-composer/issues).
-* [Report a security vulnerability](./SECURITY).
+* [Report a security vulnerability](./SECURITY.md).
 * [Submit a pull request](https://github.com/open-edge-platform/os-image-composer/pulls).
 
 
