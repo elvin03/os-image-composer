@@ -42,7 +42,7 @@ func FetchPackages(urls []string, destDir string, workers int) error {
 		}),
 	)
 
-	// create a shared bolean flag to signal a download error
+	// create a shared boolean flag to signal a download error
 	downloadError := false
 
 	// start worker goroutines
