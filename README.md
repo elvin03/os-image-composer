@@ -227,14 +227,27 @@ Displays the tool’s version number, build date, and Git commit SHA:
 Installs the shell completion feature for your current shell or a specified shell:
 
 ```bash
-# Auto-detect shell
+# Auto-detect shell and create completion file
 ./os-image-composer install-completion
 
 # Specify shell type
+./os-image-composer install-completion --shell bash
 ./os-image-composer install-completion --shell zsh
+./os-image-composer install-completion --shell fish
+./os-image-composer install-completion --shell powershell
 
-# Force overwrite existing completion
+# Force overwrite existing completion files
 ./os-image-composer install-completion --force
+```
+
+**Important**: The command creates completion files but additional activation steps are required:
+
+Bash:
+
+```bash
+# Add to your ~/.bashrc
+echo "source ~/.bash_completion.d/os-image-composer.bash" >> ~/.bashrc
+source ~/.bashrc
 ```
 
 Reload your shell configuration based on the shell that you are using:
@@ -245,17 +258,25 @@ Bash:
 source ~/.bashrc
 ```
 
-Zsh:
+Zsh (May need fpath setup):
 
-```bash
+```zsh
+# Ensure completion directory is in fpath (add to ~/.zshrc if needed)
+echo 'fpath=(~/.zsh/completion $fpath)' >> ~/.zshrc
 source ~/.zshrc
 ```
 
-Fish: Nothing is needed; it should work immediately.
+Fish (Works automatically):
 
-PowerShell:
+```fish
+# Just restart your terminal
+```
+
+PowerShell (May need execution policy):
 
 ```powershell
+# May need to allow script execution
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 . $PROFILE
 ```
 
@@ -266,8 +287,6 @@ os-image-composer [TAB]
 os-image-composer b[TAB]
 os-image-composer build --[TAB]
 ```
-
-See the [Shell Completion](#shell-completion-feature) section for details.
 
 ### Image Template Format
 
