@@ -5,7 +5,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"time"
 
@@ -121,54 +120,6 @@ func UserPackages() ([]ospackage.PackageInfo, error) {
 	// 	log.Debugf("rpm pkg -> %s %s %s", pkg.Name, pkg.Version, pkg.URL)
 	// }
 	// return []ospackage.PackageInfo{}, nil //fmt.Errorf("yockgen user package fetching not supported for rpm")
-}
-
-func MatchRequested(requests []string, all []ospackage.PackageInfo) ([]ospackage.PackageInfo, error) {
-	var out []ospackage.PackageInfo
-
-	for _, want := range requests {
-		var candidates []ospackage.PackageInfo
-		for _, pi := range all {
-			if pi.Arch == "src" {
-				continue
-			}
-			// 1) exact name match
-			if pi.Name == want || pi.Name == want+".rpm" {
-				candidates = append(candidates, pi)
-				break
-			}
-			// 2) prefix by want-version ("acl-")
-			// Only match if the part after "want-" is a version (starts with a digit)
-			// prevent getting acl-dev when asking for acl-9.2
-			if strings.HasPrefix(pi.Name, want+"-") {
-				rest := strings.TrimPrefix(pi.Name, want+"-")
-				if isValidVersionFormat(rest) {
-					candidates = append(candidates, pi)
-					continue
-				}
-			}
-			// 3) prefix by want.release ("acl-2.3.1-2.")
-			if strings.HasPrefix(pi.Name, want+".") {
-				candidates = append(candidates, pi)
-			}
-		}
-
-		if len(candidates) == 0 {
-			return nil, fmt.Errorf("requested package %q not found in repo", want)
-		}
-		// If we got an exact match in step (1), it's the only candidate
-		if len(candidates) == 1 && (candidates[0].Name == want || candidates[0].Name == want+".rpm") {
-			out = append(out, candidates[0])
-			continue
-		}
-		// Otherwise pick the "highest" by lex sort
-		sort.Slice(candidates, func(i, j int) bool {
-			return candidates[i].Name > candidates[j].Name
-		})
-		out = append(out, candidates[0])
-	}
-
-	return out, nil
 }
 
 func isAcceptedChar(s string) bool {
