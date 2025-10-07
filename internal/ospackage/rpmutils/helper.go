@@ -50,7 +50,26 @@ func resolveMultiCandidates(parentPkg ospackage.PackageInfo, candidates []ospack
 	ver := ""
 	hasVersionConstraint := false
 	if len(candidates) > 0 {
-		op, ver, hasVersionConstraint = extractVersionRequirement(parentPkg.RequiresVer, candidates[0].Name)
+		op, ver, hasVersionConstraint = extractVersionRequirement(parentPkg.RequiresVer, extractBasePackageNameFromFile(candidates[0].Name))
+	}
+
+	//yockgen
+	depNm := extractBasePackageNameFromFile(candidates[0].Name)
+	parentFilter := "systemd-ukify"
+	depFilter := "systemd"
+	if strings.HasPrefix(parentPkg.Name, parentFilter) && depNm == depFilter {
+		fmt.Printf("op, ver, hasVersionConstraint = extractVersionRequirement(%#v, %#v)\n", parentPkg.RequiresVer, extractBasePackageNameFromFile(candidates[0].Name))
+		fmt.Printf("\nyockgen99: parent=%s", parentPkg.Name)
+		for _, req := range parentPkg.RequiresVer {
+			if strings.HasPrefix(req, depNm) {
+				fmt.Printf(" required=%s\n", req)
+			}
+		}
+		if !hasVersionConstraint {
+			fmt.Printf("yockgen99: no version specified for %s\n\n", extractBasePackageNameFromFile(candidates[0].Name))
+		} else {
+			fmt.Printf("yockgen99: version constraint for %s is %s%s\n\n", extractBasePackageNameFromFile(candidates[0].Name), op, ver)
+		}
 	}
 
 	if hasVersionConstraint {
@@ -211,47 +230,6 @@ func extractRepoBase(rawURL string) (string, error) {
 
 	log.Errorf("Unable to extract repo base from URL: %s", rawURL)
 	return "", fmt.Errorf("unable to extract repo base from URL: %s", rawURL)
-}
-
-func extractVersionRequirement(reqVers []string, depName string) (op string, ver string, found bool) {
-	for _, reqVer := range reqVers {
-		reqVer = strings.TrimSpace(reqVer)
-
-		// Handle alternatives (|) - check if our depName is in any of the alternatives
-		alternatives := strings.Split(reqVer, "|")
-		for _, alt := range alternatives {
-			alt = strings.TrimSpace(alt)
-
-			// Check if this alternative starts with the dependency name we're looking for
-			//cleanReqName := cleanDependencyName(alt)
-			cleanReqName := alt
-			if cleanReqName != depName {
-				continue // Skip to next alternative
-			}
-
-			// Found our dependency in this alternative, now extract version constraint
-			// Find version constraint inside parentheses
-			if idx := strings.Index(alt, "("); idx != -1 {
-				verConstraint := alt[idx+1:]
-				if idx2 := strings.Index(verConstraint, ")"); idx2 != -1 {
-					verConstraint = verConstraint[:idx2]
-				}
-
-				// Split into operator and version
-				parts := strings.Fields(verConstraint)
-				if len(parts) == 2 {
-					op := parts[0]
-					ver := parts[1]
-					return op, ver, true
-				}
-			}
-
-			// If we found the dependency but no version constraint, return found=false
-			return "", "", false
-		}
-	}
-
-	return "", "", false
 }
 
 func comparePackageVersions(a, b string) (int, error) {
@@ -659,4 +637,103 @@ func ResolveTopPackageConflicts(want, pkgType string, all []ospackage.PackageInf
 	})
 
 	return candidates[0], true
+}
+
+func extractVersionRequirement01(reqVers []string, depName string) (op string, ver string, found bool) {
+	for _, reqVer := range reqVers {
+		reqVer = strings.TrimSpace(reqVer)
+
+		// Handle alternatives (|) - check if our depName is in any of the alternatives
+		alternatives := strings.Split(reqVer, "|")
+		for _, alt := range alternatives {
+			alt = strings.TrimSpace(alt)
+
+			// Check if this alternative starts with the dependency name we're looking for
+			//cleanReqName := cleanDependencyName(alt)
+			cleanReqName := alt
+			if cleanReqName != depName {
+				continue // Skip to next alternative
+			}
+
+			// Found our dependency in this alternative, now extract version constraint
+			// Find version constraint inside parentheses
+			if idx := strings.Index(alt, "("); idx != -1 {
+				verConstraint := alt[idx+1:]
+				if idx2 := strings.Index(verConstraint, ")"); idx2 != -1 {
+					verConstraint = verConstraint[:idx2]
+				}
+
+				// Split into operator and version
+				parts := strings.Fields(verConstraint)
+				if len(parts) == 2 {
+					op := parts[0]
+					ver := parts[1]
+					return op, ver, true
+				}
+			}
+
+			// If we found the dependency but no version constraint, return found=false
+			return "", "", false
+		}
+	}
+
+	return "", "", false
+}
+
+func extractVersionRequirement(reqVers []string, depName string) (op string, ver string, found bool) {
+	for _, reqVer := range reqVers {
+		reqVer = strings.TrimSpace(reqVer)
+
+		// Handle alternatives (|) - check if our depName is in any of the alternatives
+		alternatives := strings.Split(reqVer, "|")
+		for _, alt := range alternatives {
+			alt = strings.TrimSpace(alt)
+
+			// Extract the base package name from the requirement
+			var baseName string
+			if idx := strings.Index(alt, " ("); idx != -1 {
+				// Case: "systemd (= 0:255-29.emt3)"
+				baseName = strings.TrimSpace(alt[:idx])
+			} else if idx := strings.Index(alt, "("); idx != -1 {
+				// Case: "python3dist(cryptography)"
+				baseName = strings.TrimSpace(alt[:idx])
+			} else {
+				// Case: no parentheses, just the package name
+				baseName = alt
+			}
+
+			// Check if this matches our dependency name
+			if baseName != depName {
+				continue // Skip to next alternative
+			}
+
+			// Found our dependency, now extract version constraint
+			// Look for version constraint in format: "packagename (operator version)"
+			if idx := strings.Index(alt, " ("); idx != -1 {
+				verConstraint := alt[idx+2:] // Skip " ("
+				if idx2 := strings.Index(verConstraint, ")"); idx2 != -1 {
+					verConstraint = verConstraint[:idx2]
+				}
+
+				// Split into operator and version
+				parts := strings.Fields(verConstraint)
+				if len(parts) >= 2 {
+					op := parts[0]
+					ver := strings.Join(parts[1:], " ") // Join in case version has spaces
+
+					// Handle epoch format (e.g., "0:255-29.emt3" -> "255-29.emt3")
+					if colonIdx := strings.Index(ver, ":"); colonIdx != -1 {
+						ver = ver[colonIdx+1:]
+					}
+
+					return op, ver, true
+				}
+			}
+
+			// If we found the dependency but no version constraint, return found=false
+			return "", "", false
+		}
+	}
+
+	return "", "", false
 }

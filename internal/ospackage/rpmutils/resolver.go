@@ -235,7 +235,7 @@ func ParseRepositoryMetadata(baseURL, gzHref string) ([]ospackage.PackageInfo, e
 										if flags != "" && versionPart != "" {
 											// Convert flags to readable format (GE = >=, EQ = =, etc.)
 											operator := convertFlags(flags)
-											versionConstraint = fmt.Sprintf("%s (%s%s)", name, operator, versionPart) // samuel (>=2.3)
+											versionConstraint = fmt.Sprintf("%s (%s %s)", name, operator, versionPart) // samuel (>=2.3)
 										} else if versionPart != "" {
 											// Version info but no operator, assume equality
 											versionConstraint = fmt.Sprintf("%s = %s", name, versionPart)
@@ -641,8 +641,8 @@ func ResolveDependencies02(requested []ospackage.PackageInfo, all []ospackage.Pa
 			}
 
 			//check if already resolved
-			// if _, seen := neededSet[fileName]; seen {
-			if seen := findMatchingKeyInNeededSet(neededSet, depName); seen {
+			if _, seen := neededSet[depName]; seen {
+				// if seen := findMatchingKeyInNeededSet(neededSet, depName); seen {
 				// ENHANCEMENT: Check version compatibility for already-resolved dependencies
 				existing, err := findAllCandidates(cur, depName, convertMapToSlice(resultMap))
 				if err == nil && len(existing) > 0 {
@@ -665,6 +665,7 @@ func ResolveDependencies02(requested []ospackage.PackageInfo, all []ospackage.Pa
 				if resultPkg, exists := resultMap[cur.Name]; exists {
 					resultPkg.Requires = append(resultPkg.Requires, depName)
 				}
+
 				continue
 			}
 
@@ -685,6 +686,22 @@ func ResolveDependencies02(requested []ospackage.PackageInfo, all []ospackage.Pa
 				if resultPkg, exists := resultMap[cur.Name]; exists {
 					resultPkg.Requires = append(resultPkg.Requires, chosenCandidate.Name)
 				}
+
+				//yockgen
+				// if strings.HasPrefix(depName, "systemd") && strings.HasPrefix(cur.Name, "systemd-ukify") {
+				// 	for k := range neededSet {
+				// 		if strings.HasPrefix(k, "systemd") {
+				// 			fmt.Printf("yockgen dep=%s parent=%s req=", depName, cur.Name)
+				// 			for _, r := range cur.RequiresVer {
+				// 				if strings.HasPrefix(r, "systemd") {
+				// 					fmt.Printf("%s,", r)
+				// 				}
+				// 			}
+				// 			fmt.Printf("\nchosen=%s", chosenCandidate.Name)
+				// 			fmt.Printf("\n\n")
+				// 		}
+				// 	}
+				// }
 
 				// Add chosen candidate to the queue for further processing
 				queue = append(queue, chosenCandidate)
