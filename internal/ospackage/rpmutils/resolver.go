@@ -636,15 +636,16 @@ func ResolveDependencies02(requested []ospackage.PackageInfo, all []ospackage.Pa
 			// Use proper dependency name cleaning
 			// depName := extractBaseRequirement(dep)
 			depName := extractBaseNameFromDep(dep)
-			if depName == "" {
+			filename, seen := findMatchingKeyInNeededSet(neededSet, depName)
+			if depName == "" || neededSet[filename] != struct{}{} {
 				continue
 			}
 
 			//check if already resolved
-			if _, seen := neededSet[depName]; seen {
-				// if seen := findMatchingKeyInNeededSet(neededSet, depName); seen {
+			// if _, seen := neededSet[depName]; seen {
+			if seen {
 				// ENHANCEMENT: Check version compatibility for already-resolved dependencies
-				existing, err := findAllCandidates(cur, depName, convertMapToSlice(resultMap))
+				existing, err := findAllCandidates(cur, depName, queue) //convertMapToSlice(resultMap))
 				if err == nil && len(existing) > 0 {
 					// Validate that existing package satisfies current requirement
 					_, err := resolveMultiCandidates(cur, existing)
@@ -657,13 +658,13 @@ func ResolveDependencies02(requested []ospackage.PackageInfo, all []ospackage.Pa
 								break
 							}
 						}
-						return nil, fmt.Errorf("conflicting package dependencies: %s_%s requires %s, but %s_%s is already selected",
-							cur.Name, cur.Version, requiredVer, existing[0].Name, existing[0].Version)
+						return nil, fmt.Errorf("conflicting package dependencies: %s_%s requires %s, but %s is already selected",
+							cur.Name, cur.Version, requiredVer, existing[0].Name)
 					}
 				}
 				// Append to parent's Requires field even if already resolved
 				if resultPkg, exists := resultMap[cur.Name]; exists {
-					resultPkg.Requires = append(resultPkg.Requires, depName)
+					resultPkg.Requires = append(resultPkg.Requires, filename)
 				}
 
 				continue
@@ -738,14 +739,14 @@ func convertMapToSlice(resultMap map[string]*ospackage.PackageInfo) []ospackage.
 
 // findMatchingKeyInNeededSet checks if any key in neededSet contains depName as a substring,
 // and returns the first matching key whose base package name equals depName.
-func findMatchingKeyInNeededSet(neededSet map[string]struct{}, depName string) bool {
+func findMatchingKeyInNeededSet(neededSet map[string]struct{}, depName string) (string, bool) {
 	for k := range neededSet {
 		if strings.Contains(k, depName) {
 			fileName := extractBasePackageNameFromFile(k)
 			if fileName == depName {
-				return true
+				return k, true
 			}
 		}
 	}
-	return false
+	return "", false
 }
