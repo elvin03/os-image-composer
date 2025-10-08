@@ -335,6 +335,12 @@ func findAllCandidates(parent ospackage.PackageInfo, depName string, all []ospac
 		}
 	}
 
+	// Sort candidates by version (highest version first)
+	sort.Slice(candidates, func(i, j int) bool {
+		cmp, _ := comparePackageVersions(candidates[i].Version, candidates[j].Version)
+		return cmp > 0
+	})
+
 	// yockgen Instead of matching the whole string, check if depName has a prefix "curl-libs-8."
 	// if strings.HasPrefix(depName, "libpopt.so.0") {
 
