@@ -122,31 +122,6 @@ func UserPackages() ([]ospackage.PackageInfo, error) {
 	return allUserPackages, nil
 }
 
-func isAcceptedChar(s string) bool {
-	for i := 0; i < len(s); i++ {
-		if (s[i] < '0' || s[i] > '9') && s[i] != '-' {
-			return false
-		}
-	}
-	return len(s) > 0
-}
-
-func isValidVersionFormat(s string) bool {
-	// Check if the string is all digits up to the next '.'
-	dotIdx := strings.IndexByte(s, '.')
-	var prefix string
-	if dotIdx == -1 {
-		prefix = s
-	} else {
-		prefix = s[:dotIdx]
-	}
-	if len(prefix) > 0 && isAcceptedChar(prefix) {
-		return true
-	}
-	// If we reach here, the format is not valid
-	return false
-}
-
 // isBinaryGPGKey checks if the data appears to be a binary GPG key
 func isBinaryGPGKey(data []byte) bool {
 	// Check for ASCII armored format first

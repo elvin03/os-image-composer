@@ -577,15 +577,6 @@ func ResolveDependencies(requested []ospackage.PackageInfo, all []ospackage.Pack
 	return result, nil
 }
 
-// Helper function to convert map to slice for findAllCandidates
-func convertMapToSlice(resultMap map[string]*ospackage.PackageInfo) []ospackage.PackageInfo {
-	slice := make([]ospackage.PackageInfo, 0, len(resultMap))
-	for _, pkg := range resultMap {
-		slice = append(slice, *pkg)
-	}
-	return slice
-}
-
 // findMatchingKeyInNeededSet checks if any key in neededSet contains depName as a substring,
 // and returns the first matching key whose base package name equals depName.
 func findMatchingKeyInNeededSet(neededSet map[string]struct{}, depName string) (string, bool) {
