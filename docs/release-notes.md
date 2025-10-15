@@ -27,9 +27,6 @@
 
 ### Known Issues/Opens
 
-- Compatible dependency packages for Edge AI Libraries are missing in Debian
-   repositories:
-   - Currently, support for a sample DL Streamer application​ is in development.
 - Installation from ISO images on NVMe SSD and via USB is not functional on
   RPL platforms.
 - Face Detection and Recognition application output video is not
