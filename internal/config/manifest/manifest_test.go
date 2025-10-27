@@ -389,7 +389,9 @@ func TestCopySBOMToChroot_InvalidChrootPath(t *testing.T) {
 		t.Fatalf("Failed to change directory permissions: %v", err)
 	}
 	// Restore permissions after test for cleanup
-	defer os.Chmod(invalidPath, 0755)
+	defer func() {
+		_ = os.Chmod(invalidPath, 0755) // Ignore error on cleanup
+	}()
 
 	// Create source SBOM file
 	tempDir := config.TempDir()
