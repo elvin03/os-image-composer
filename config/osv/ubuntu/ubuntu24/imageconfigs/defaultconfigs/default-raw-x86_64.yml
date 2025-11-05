@@ -66,8 +66,9 @@ systemConfig:
   packages:
     - ubuntu-minimal
     - systemd-boot
-    - initramfs-tools
+    - dracut-core
     - systemd
+    - cryptsetup-bin
 
   additionalFiles:
     - local: ../additionalfiles/dhcp.network
@@ -77,6 +78,6 @@ systemConfig:
 
   kernel:
     version: "6.14"
-    cmdline: "rd.debug rd.break console=ttyS0,115200 console=tty0 loglevel=7"
+    cmdline: "console=ttyS0,115200 console=tty0 loglevel=7"
     packages:
       - linux-image-generic-hwe-24.04

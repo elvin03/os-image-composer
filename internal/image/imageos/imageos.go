@@ -820,7 +820,7 @@ func buildImageUKI(installRoot string, template *config.ImageTemplate) error {
 
 		// 2. Build UKI with ukify
 		kernelPath := filepath.Join("/boot", "vmlinuz-"+kernelVersion)
-		// Ubuntu uses initrd.img- prefix, others use initramfs- prefix
+		// Ubuntu uses initrd.img- prefix, other distributions use initramfs- prefix
 		var initrdPath string
 		if template.Target.OS == "ubuntu" {
 			initrdPath = fmt.Sprintf("/boot/initrd.img-%s", kernelVersion)
@@ -877,25 +877,17 @@ func getKernelVersion(installRoot string) (string, error) {
 
 // Helper to update initramfs for the given kernel version
 func updateInitramfs(installRoot, kernelVersion string, template *config.ImageTemplate) error {
-	initrdPath := fmt.Sprintf("/boot/initramfs-%s.img", kernelVersion)
-
-	// Check if we're dealing with Ubuntu, which uses initramfs-tools instead of dracut
+	// Check if we're dealing with Ubuntu, which uses different naming convention
 	if template.Target.OS == "ubuntu" {
 		return updateInitramfsUbuntu(installRoot, kernelVersion, template)
 	}
 
+	// Other distributions use initramfs- prefix
+	initrdPath := fmt.Sprintf("/boot/initramfs-%s.img", kernelVersion)
+
+	// For immutable systems, use standard dracut - dm-verity will be handled by main systemd
 	if template.IsImmutabilityEnabled() {
-		cmd := fmt.Sprintf(
-			"dracut --force --add systemd-veritysetup --no-hostonly --verbose --kver %s %s",
-			kernelVersion,
-			initrdPath,
-		)
-		_, err := shell.ExecCmd(cmd, true, installRoot, nil)
-		if err != nil {
-			log.Errorf("Failed to update initramfs with veritysetup: %v", err)
-			err = fmt.Errorf("failed to update initramfs with veritysetup: %w", err)
-		}
-		return err
+		log.Infof("Creating standard initramfs for immutable system - dm-verity will be handled by main systemd")
 	}
 	// Check if the initrdPath file exists; if not, create it
 	fullInitrdPath := filepath.Join(installRoot, initrdPath)
@@ -917,14 +909,10 @@ func updateInitramfs(installRoot, kernelVersion string, template *config.ImageTe
 	return err
 }
 
-// Helper to update initramfs for Ubuntu using initramfs-tools
+// Helper to update initramfs for Ubuntu using dracut
 func updateInitramfsUbuntu(installRoot, kernelVersion string, template *config.ImageTemplate) error {
-	// For Ubuntu, the initrd path typically uses "initrd.img-" prefix
+	// Ubuntu uses the initrd.img-<version> naming convention for compatibility
 	initrdPath := fmt.Sprintf("/boot/initrd.img-%s", kernelVersion)
-
-	if template.IsImmutabilityEnabled() {
-		return updateInitramfsUbuntuWithVerity(installRoot, kernelVersion, template)
-	}
 
 	// Check if the initrdPath file exists; if not, create it
 	fullInitrdPath := filepath.Join(installRoot, initrdPath)
@@ -936,176 +924,44 @@ func updateInitramfsUbuntu(installRoot, kernelVersion string, template *config.I
 		log.Debugf("Ubuntu Failed to list files in %s: %v", initrdDir, err)
 	}
 
-	if _, err := os.Stat(fullInitrdPath); err == nil {
-		// initrd file already exists
-		log.Debugf("Ubuntu initramfs already exists, skipping update: %s", fullInitrdPath)
-		return nil
+	// For dracut-based systems, always regenerate with dracut (don't check existing files)
+	immutabilityEnabled := template.IsImmutabilityEnabled()
+	log.Infof("DEBUG: IsImmutabilityEnabled() = %v", immutabilityEnabled)
+	if immutabilityEnabled {
+		log.Infof("Immutable system detected - will force regenerate initramfs with dracut")
+	} else {
+		if _, err := os.Stat(fullInitrdPath); err == nil {
+			// initrd file already exists for non-immutable systems
+			log.Debugf("Ubuntu initramfs already exists, skipping update: %s", fullInitrdPath)
+			return nil
+		}
 	}
 
-	// Use update-initramfs command which is the standard tool for Ubuntu
-	cmd := fmt.Sprintf("update-initramfs -c -k %s", kernelVersion)
+	// For Ubuntu with immutable systems, use dracut with dm-verity support
+	var cmd string
+	if template.IsImmutabilityEnabled() {
+		log.Infof("Creating Ubuntu dracut initramfs with dm-verity support")
+		cmd = fmt.Sprintf(
+			"dracut --force --add dm --add crypt --add systemd --add systemd-veritysetup --no-hostonly --verbose --kver %s %s",
+			kernelVersion,
+			initrdPath,
+		)
+	} else {
+		log.Infof("Creating standard Ubuntu dracut initramfs")
+		cmd = fmt.Sprintf(
+			"dracut --force --add systemd --no-hostonly --verbose --kver %s %s",
+			kernelVersion,
+			initrdPath,
+		)
+	}
+
 	_, err := shell.ExecCmd(cmd, true, installRoot, nil)
 	if err != nil {
-		log.Errorf("Failed to update Ubuntu initramfs: %v", err)
-		err = fmt.Errorf("failed to update Ubuntu initramfs: %w", err)
+		log.Errorf("Failed to update Ubuntu dracut initramfs: %v", err)
+		err = fmt.Errorf("failed to update Ubuntu dracut initramfs: %w", err)
 	}
 
 	return err
-}
-
-// Helper to update initramfs for Ubuntu with dm-verity support using initramfs-tools
-func updateInitramfsUbuntuWithVerity(installRoot, kernelVersion string, template *config.ImageTemplate) error {
-	log.Infof("Creating Ubuntu initramfs with dm-verity support for kernel %s", kernelVersion)
-
-	initrdPath := fmt.Sprintf("/boot/initrd.img-%s", kernelVersion)
-	fullInitrdPath := filepath.Join(installRoot, initrdPath)
-
-	// Check if the initrd already exists
-	if _, err := os.Stat(fullInitrdPath); err == nil {
-		log.Debugf("Ubuntu initramfs with verity already exists, skipping update: %s", fullInitrdPath)
-		return nil
-	}
-
-	// Create custom initramfs-tools hook for dm-verity support
-	if err := createUbuntuVerityHook(installRoot); err != nil {
-		return fmt.Errorf("failed to create Ubuntu verity hook: %w", err)
-	}
-
-	// Create custom local-bottom script for dm-verity setup
-	if err := createUbuntuVerityScript(installRoot); err != nil {
-		return fmt.Errorf("failed to create Ubuntu verity script: %w", err)
-	}
-
-	// Generate initramfs with the verity support
-	cmd := fmt.Sprintf("update-initramfs -c -k %s", kernelVersion)
-	_, err := shell.ExecCmd(cmd, true, installRoot, nil)
-	if err != nil {
-		log.Errorf("Failed to update Ubuntu initramfs with verity: %v", err)
-		return fmt.Errorf("failed to update Ubuntu initramfs with verity: %w", err)
-	}
-
-	log.Infof("Successfully created Ubuntu initramfs with dm-verity support")
-	return nil
-}
-
-// createUbuntuVerityHook creates an initramfs-tools hook to include dm-verity tools
-func createUbuntuVerityHook(installRoot string) error {
-	hookDir := filepath.Join(installRoot, "usr/share/initramfs-tools/hooks")
-	hookFile := filepath.Join(hookDir, "dmverity")
-
-	// Create the directory structure using Go's os.MkdirAll
-	if err := os.MkdirAll(hookDir, 0755); err != nil {
-		return fmt.Errorf("failed to create hooks directory: %w", err)
-	}
-
-	hookContent := `#!/bin/sh
-# dm-verity hook for initramfs-tools
-
-case $1 in
-prereqs)
-	echo "dmsetup"
-	exit 0
-	;;
-esac
-
-. /usr/share/initramfs-tools/hook-functions
-
-# Include veritysetup binary
-copy_exec /usr/sbin/veritysetup
-
-# Include systemd-veritysetup if available
-if [ -x /lib/systemd/systemd-veritysetup ]; then
-	copy_exec /lib/systemd/systemd-veritysetup
-fi
-
-# Include dm-verity kernel module
-manual_add_modules dm_verity
-manual_add_modules dm_mod
-
-echo "dm-verity support added to initramfs"
-`
-
-	// Write the file directly using os.WriteFile
-	if err := os.WriteFile(hookFile, []byte(hookContent), 0755); err != nil {
-		return fmt.Errorf("failed to write verity hook: %w", err)
-	}
-
-	log.Debugf("Created Ubuntu dm-verity hook: %s", hookFile)
-	return nil
-}
-
-// createUbuntuVerityScript creates a local-bottom script to handle dm-verity setup
-func createUbuntuVerityScript(installRoot string) error {
-	scriptDir := filepath.Join(installRoot, "usr/share/initramfs-tools/scripts/local-bottom")
-	scriptFile := filepath.Join(scriptDir, "dmverity")
-
-	// Create the directory structure using Go's os.MkdirAll
-	if err := os.MkdirAll(scriptDir, 0755); err != nil {
-		return fmt.Errorf("failed to create scripts directory: %w", err)
-	}
-
-	scriptContent := `#!/bin/sh
-# dm-verity local-bottom script for initramfs-tools
-
-PREREQ=""
-
-prereqs()
-{
-	echo $PREREQ
-}
-
-case $1 in
-prereqs)
-	prereqs
-	exit 0
-	;;
-esac
-
-. /scripts/functions
-
-# Only proceed if dm-verity parameters are present
-if ! grep -q "systemd.verity" /proc/cmdline; then
-	exit 0
-fi
-
-log_begin_msg "Setting up dm-verity for root filesystem"
-
-# Parse kernel command line for dm-verity parameters
-# Expected format: systemd.verity_name=root systemd.verity_root_data=/dev/sdX
-eval $(grep -o 'systemd\.verity[^ ]*' /proc/cmdline | tr ' ' '\n' | sed 's/systemd\.verity_/VERITY_/g' | sed 's/=/ /')
-
-if [ -n "$VERITY_name" ] && [ -n "$VERITY_root_data" ] && [ -n "$VERITY_root_hash" ]; then
-	# Use systemd-veritysetup if available
-	if [ -x /lib/systemd/systemd-veritysetup ]; then
-		log_begin_msg "Using systemd-veritysetup for dm-verity setup"
-		/lib/systemd/systemd-veritysetup attach "$VERITY_name" "$VERITY_root_data" "$VERITY_root_hash"
-		EXIT_CODE=$?
-	else
-		log_failure_msg "systemd-veritysetup not found"
-		EXIT_CODE=1
-	fi
-
-	if [ $EXIT_CODE -eq 0 ]; then
-		log_success_msg "dm-verity setup completed successfully"
-		# Update ROOT to point to the dm-verity device
-		ROOT="/dev/mapper/$VERITY_name"
-	else
-		log_failure_msg "dm-verity setup failed"
-	fi
-else
-	log_warning_msg "Incomplete dm-verity parameters in kernel command line"
-fi
-
-log_end_msg
-`
-
-	// Write the file directly using os.WriteFile
-	if err := os.WriteFile(scriptFile, []byte(scriptContent), 0755); err != nil {
-		return fmt.Errorf("failed to write verity script: %w", err)
-	}
-
-	log.Debugf("Created Ubuntu dm-verity script: %s", scriptFile)
-	return nil
 }
 
 // Helper to determine the ESP directory (assumes /boot/efi)
