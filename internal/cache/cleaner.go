@@ -192,7 +192,7 @@ func workspaceTargets(providerID string) ([]string, []string, error) {
 		providers = append(providers, providerID)
 	}
 
-	targets := []string{}
+	var targets []string
 	for _, provider := range providers {
 		for _, sub := range []string{"chrootenv", "chrootbuild"} {
 			target := filepath.Join(workDir, provider, sub)
