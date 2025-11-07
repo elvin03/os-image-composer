@@ -893,6 +893,7 @@ func updateInitramfs(installRoot, kernelVersion string, template *config.ImageTe
 	// 		return nil
 	// 	}
 	// }
+	log.Debugf("Yockgen EnableExtraModules: %s", template.SystemConfig.Kernel.EnableExtraModules)
 
 	// Build dracut command with all required options
 	var cmdParts []string
@@ -907,7 +908,11 @@ func updateInitramfs(installRoot, kernelVersion string, template *config.ImageTe
 	}
 
 	// Always add USB drivers
-	cmdParts = append(cmdParts, "--add-drivers", "'usbcore usb-common'")
+	// extraModules := "usbcore usb-common"
+	extraModules := strings.TrimSpace(template.SystemConfig.Kernel.EnableExtraModules)
+	if extraModules != "" {
+		cmdParts = append(cmdParts, fmt.Sprintf("--add-drivers '%s'", extraModules))
+	}
 
 	// Add kernel version and output path
 	cmdParts = append(cmdParts, "--kver", kernelVersion)
