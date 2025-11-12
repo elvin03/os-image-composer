@@ -588,11 +588,12 @@ func TestProgressView_MonitorStatus(t *testing.T) {
 	}
 
 	// Test monitorStatus
+	progress := make(chan int)
 	status := make(chan string, 3)
 	wg := new(sync.WaitGroup)
 	wg.Add(1)
 
-	go pv.monitorStatus(status, wg)
+	go pv.monitorStatus(progress, status, wg)
 
 	// Send some status updates
 	status <- "Installing packages..."

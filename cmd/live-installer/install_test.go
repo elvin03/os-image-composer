@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/open-edge-platform/os-image-composer/internal/chroot/chrootbuild"
 	"github.com/open-edge-platform/os-image-composer/internal/config"
 )
 
@@ -101,7 +100,7 @@ func TestDependencyCheck_AzureLinux(t *testing.T) {
 	// This test will likely fail unless the dependencies are installed
 	// We're testing that the function properly checks for dependencies
 	err := dependencyCheck("azure-linux")
-	
+
 	// We expect either success (if deps are installed) or a specific error format
 	if err != nil {
 		// Error should mention a specific command and package
@@ -114,7 +113,7 @@ func TestDependencyCheck_AzureLinux(t *testing.T) {
 
 func TestDependencyCheck_EdgeMicrovisorToolkit(t *testing.T) {
 	err := dependencyCheck("edge-microvisor-toolkit")
-	
+
 	// We expect either success (if deps are installed) or a specific error format
 	if err != nil {
 		errStr := err.Error()
@@ -126,7 +125,7 @@ func TestDependencyCheck_EdgeMicrovisorToolkit(t *testing.T) {
 
 func TestDependencyCheck_WindRiverELXR(t *testing.T) {
 	err := dependencyCheck("wind-river-elxr")
-	
+
 	// We expect either success (if deps are installed) or a specific error format
 	if err != nil {
 		errStr := err.Error()
@@ -176,7 +175,7 @@ func TestRemoveOldBootEntries_NoEfibootmgr(t *testing.T) {
 	// This test checks if the function handles missing efibootmgr gracefully
 	// The test may fail if efibootmgr is not available (expected behavior)
 	err := removeOldBootEntries()
-	
+
 	// We accept both success (if efibootmgr exists) or a specific error
 	if err != nil {
 		// Error should be about failing to list boot entries
@@ -382,26 +381,5 @@ func TestNewChrootBuilder_InvalidConfigFormat(t *testing.T) {
 	// Error should mention validation failure
 	if !strings.Contains(err.Error(), "validation") {
 		t.Errorf("expected error to mention validation, got: %v", err)
-	}
-}
-
-// Helper function to validate ChrootBuilder fields
-func validateChrootBuilder(t *testing.T, builder *chrootbuild.ChrootBuilder, expectedDir, expectedCache string) {
-	t.Helper()
-
-	if builder == nil {
-		t.Fatal("chroot builder is nil")
-	}
-
-	if builder.TargetOsConfigDir != expectedDir {
-		t.Errorf("TargetOsConfigDir: expected %q, got %q", expectedDir, builder.TargetOsConfigDir)
-	}
-
-	if builder.ChrootPkgCacheDir != expectedCache {
-		t.Errorf("ChrootPkgCacheDir: expected %q, got %q", expectedCache, builder.ChrootPkgCacheDir)
-	}
-
-	if builder.TargetOsConfig == nil {
-		t.Error("TargetOsConfig is nil")
 	}
 }

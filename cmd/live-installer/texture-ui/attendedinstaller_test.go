@@ -12,7 +12,17 @@ import (
 	"time"
 
 	"github.com/open-edge-platform/os-image-composer/internal/config"
+	"github.com/open-edge-platform/os-image-composer/internal/utils/shell"
 )
+
+const LsblkOutput = `{
+   "blockdevices": [
+      {"name":"sda", "size":500107862016, "model":"CT500MX500SSD1  "},
+      {"name":"sdb", "size":62746787840, "model":"Extreme         "},
+      {"name":"nvme0n1", "size":512110190592, "model":"INTEL SSDPEKNW512G8                     "}
+   ]
+}
+`
 
 func TestNew(t *testing.T) {
 	template := &config.ImageTemplate{
@@ -31,6 +41,13 @@ func TestNew(t *testing.T) {
 			},
 		},
 	}
+
+	originalExecutor := shell.Default
+	defer func() { shell.Default = originalExecutor }()
+	mockExpectedOutput := []shell.MockCommand{
+		{Pattern: "lsblk", Output: LsblkOutput, Error: nil},
+	}
+	shell.Default = shell.NewMockExecutor(mockExpectedOutput)
 
 	installFunc := func(template *config.ImageTemplate, configDir, localRepo string) error {
 		return nil
@@ -80,6 +97,13 @@ func TestNew(t *testing.T) {
 }
 
 func TestNew_WithNilTemplate(t *testing.T) {
+	originalExecutor := shell.Default
+	defer func() { shell.Default = originalExecutor }()
+	mockExpectedOutput := []shell.MockCommand{
+		{Pattern: "lsblk", Output: LsblkOutput, Error: nil},
+	}
+	shell.Default = shell.NewMockExecutor(mockExpectedOutput)
+
 	installFunc := func(template *config.ImageTemplate, configDir, localRepo string) error {
 		return nil
 	}
@@ -109,6 +133,13 @@ func TestNew_InitializesViews(t *testing.T) {
 			},
 		},
 	}
+
+	originalExecutor := shell.Default
+	defer func() { shell.Default = originalExecutor }()
+	mockExpectedOutput := []shell.MockCommand{
+		{Pattern: "lsblk", Output: LsblkOutput, Error: nil},
+	}
+	shell.Default = shell.NewMockExecutor(mockExpectedOutput)
 
 	installFunc := func(template *config.ImageTemplate, configDir, localRepo string) error {
 		return nil
@@ -145,6 +176,13 @@ func TestAttendedInstaller_RecordedInstallationTime(t *testing.T) {
 			},
 		},
 	}
+
+	originalExecutor := shell.Default
+	defer func() { shell.Default = originalExecutor }()
+	mockExpectedOutput := []shell.MockCommand{
+		{Pattern: "lsblk", Output: LsblkOutput, Error: nil},
+	}
+	shell.Default = shell.NewMockExecutor(mockExpectedOutput)
 
 	installFunc := func(template *config.ImageTemplate, configDir, localRepo string) error {
 		return nil
@@ -183,6 +221,13 @@ func TestAttendedInstaller_InstallationWrapper_Success(t *testing.T) {
 			},
 		},
 	}
+
+	originalExecutor := shell.Default
+	defer func() { shell.Default = originalExecutor }()
+	mockExpectedOutput := []shell.MockCommand{
+		{Pattern: "lsblk", Output: LsblkOutput, Error: nil},
+	}
+	shell.Default = shell.NewMockExecutor(mockExpectedOutput)
 
 	called := false
 	installFunc := func(template *config.ImageTemplate, configDir, localRepo string) error {
@@ -232,6 +277,13 @@ func TestAttendedInstaller_InstallationWrapper_Error(t *testing.T) {
 			},
 		},
 	}
+
+	originalExecutor := shell.Default
+	defer func() { shell.Default = originalExecutor }()
+	mockExpectedOutput := []shell.MockCommand{
+		{Pattern: "lsblk", Output: LsblkOutput, Error: nil},
+	}
+	shell.Default = shell.NewMockExecutor(mockExpectedOutput)
 
 	expectedError := errors.New("installation failed")
 	installFunc := func(template *config.ImageTemplate, configDir, localRepo string) error {
@@ -427,6 +479,13 @@ func TestAttendedInstaller_RefreshTitle(t *testing.T) {
 		},
 	}
 
+	originalExecutor := shell.Default
+	defer func() { shell.Default = originalExecutor }()
+	mockExpectedOutput := []shell.MockCommand{
+		{Pattern: "lsblk", Output: LsblkOutput, Error: nil},
+	}
+	shell.Default = shell.NewMockExecutor(mockExpectedOutput)
+
 	installFunc := func(template *config.ImageTemplate, configDir, localRepo string) error {
 		return nil
 	}
@@ -499,6 +558,13 @@ func TestAttendedInstaller_UIInitialization(t *testing.T) {
 		},
 	}
 
+	originalExecutor := shell.Default
+	defer func() { shell.Default = originalExecutor }()
+	mockExpectedOutput := []shell.MockCommand{
+		{Pattern: "lsblk", Output: LsblkOutput, Error: nil},
+	}
+	shell.Default = shell.NewMockExecutor(mockExpectedOutput)
+
 	installFunc := func(template *config.ImageTemplate, configDir, localRepo string) error {
 		return nil
 	}
@@ -556,6 +622,13 @@ func TestAttendedInstaller_InstallationError(t *testing.T) {
 			},
 		},
 	}
+
+	originalExecutor := shell.Default
+	defer func() { shell.Default = originalExecutor }()
+	mockExpectedOutput := []shell.MockCommand{
+		{Pattern: "lsblk", Output: LsblkOutput, Error: nil},
+	}
+	shell.Default = shell.NewMockExecutor(mockExpectedOutput)
 
 	testError := errors.New("test installation error")
 	installFunc := func(template *config.ImageTemplate, configDir, localRepo string) error {

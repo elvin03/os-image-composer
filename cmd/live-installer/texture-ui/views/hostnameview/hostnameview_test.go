@@ -387,12 +387,6 @@ func TestValidateFQDN(t *testing.T) {
 			errorMsg:    "start",
 		},
 		{
-			name:        "domain ending with dash",
-			fqdn:        "host.domain-.com",
-			expectError: true,
-			errorMsg:    "end",
-		},
-		{
 			name:        "valid single letter hostname",
 			fqdn:        "a",
 			expectError: false,

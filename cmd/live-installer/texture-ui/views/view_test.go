@@ -16,8 +16,18 @@ import (
 	"github.com/open-edge-platform/os-image-composer/cmd/live-installer/texture-ui/views/progressview"
 	"github.com/open-edge-platform/os-image-composer/cmd/live-installer/texture-ui/views/userview"
 	"github.com/open-edge-platform/os-image-composer/internal/config"
+	"github.com/open-edge-platform/os-image-composer/internal/utils/shell"
 	"github.com/rivo/tview"
 )
+
+const LsblkOutput = `{
+   "blockdevices": [
+      {"name":"sda", "size":500107862016, "model":"CT500MX500SSD1  "},
+      {"name":"sdb", "size":62746787840, "model":"Extreme         "},
+      {"name":"nvme0n1", "size":512110190592, "model":"INTEL SSDPEKNW512G8                     "}
+   ]
+}
+`
 
 // TestViewInterface verifies that the View interface is properly defined
 func TestViewInterface(t *testing.T) {
@@ -126,6 +136,13 @@ func TestViewInterfaceMethodSignatures(t *testing.T) {
 			},
 		},
 	}
+
+	originalExecutor := shell.Default
+	defer func() { shell.Default = originalExecutor }()
+	mockExpectedOutput := []shell.MockCommand{
+		{Pattern: "lsblk", Output: LsblkOutput, Error: nil},
+	}
+	shell.Default = shell.NewMockExecutor(mockExpectedOutput)
 
 	app := tview.NewApplication()
 

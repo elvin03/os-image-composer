@@ -8,8 +8,18 @@ import (
 
 	"github.com/gdamore/tcell"
 	"github.com/open-edge-platform/os-image-composer/internal/config"
+	"github.com/open-edge-platform/os-image-composer/internal/utils/shell"
 	"github.com/rivo/tview"
 )
+
+const LsblkOutput = `{
+   "blockdevices": [
+      {"name":"sda", "size":500107862016, "model":"CT500MX500SSD1  "},
+      {"name":"sdb", "size":62746787840, "model":"Extreme         "},
+      {"name":"nvme0n1", "size":512110190592, "model":"INTEL SSDPEKNW512G8                     "}
+   ]
+}
+`
 
 func TestNew(t *testing.T) {
 	dv := New()
@@ -132,6 +142,13 @@ func TestDiskView_Initialize(t *testing.T) {
 		},
 	}
 
+	originalExecutor := shell.Default
+	defer func() { shell.Default = originalExecutor }()
+	mockExpectedOutput := []shell.MockCommand{
+		{Pattern: "lsblk", Output: LsblkOutput, Error: nil},
+	}
+	shell.Default = shell.NewMockExecutor(mockExpectedOutput)
+
 	app := tview.NewApplication()
 	mockFunc := func() {}
 
@@ -181,6 +198,13 @@ func TestDiskView_Initialize_WithLegacyBoot(t *testing.T) {
 		},
 	}
 
+	originalExecutor := shell.Default
+	defer func() { shell.Default = originalExecutor }()
+	mockExpectedOutput := []shell.MockCommand{
+		{Pattern: "lsblk", Output: LsblkOutput, Error: nil},
+	}
+	shell.Default = shell.NewMockExecutor(mockExpectedOutput)
+
 	app := tview.NewApplication()
 	mockFunc := func() {}
 
@@ -211,6 +235,13 @@ func TestDiskView_Primitive_AfterInitialization(t *testing.T) {
 			},
 		},
 	}
+
+	originalExecutor := shell.Default
+	defer func() { shell.Default = originalExecutor }()
+	mockExpectedOutput := []shell.MockCommand{
+		{Pattern: "lsblk", Output: LsblkOutput, Error: nil},
+	}
+	shell.Default = shell.NewMockExecutor(mockExpectedOutput)
 
 	app := tview.NewApplication()
 	mockFunc := func() {}
@@ -247,6 +278,13 @@ func TestDiskView_HandleInput_AfterInitialization(t *testing.T) {
 		},
 	}
 
+	originalExecutor := shell.Default
+	defer func() { shell.Default = originalExecutor }()
+	mockExpectedOutput := []shell.MockCommand{
+		{Pattern: "lsblk", Output: LsblkOutput, Error: nil},
+	}
+	shell.Default = shell.NewMockExecutor(mockExpectedOutput)
+
 	app := tview.NewApplication()
 	mockFunc := func() {}
 
@@ -277,6 +315,13 @@ func TestDiskView_Reset_AfterInitialization(t *testing.T) {
 			},
 		},
 	}
+
+	originalExecutor := shell.Default
+	defer func() { shell.Default = originalExecutor }()
+	mockExpectedOutput := []shell.MockCommand{
+		{Pattern: "lsblk", Output: LsblkOutput, Error: nil},
+	}
+	shell.Default = shell.NewMockExecutor(mockExpectedOutput)
 
 	app := tview.NewApplication()
 	mockFunc := func() {}
@@ -312,6 +357,13 @@ func TestDiskView_Title_AfterInitialization(t *testing.T) {
 			},
 		},
 	}
+
+	originalExecutor := shell.Default
+	defer func() { shell.Default = originalExecutor }()
+	mockExpectedOutput := []shell.MockCommand{
+		{Pattern: "lsblk", Output: LsblkOutput, Error: nil},
+	}
+	shell.Default = shell.NewMockExecutor(mockExpectedOutput)
 
 	app := tview.NewApplication()
 	mockFunc := func() {}
@@ -350,6 +402,13 @@ func TestDiskView_SwitchMode(t *testing.T) {
 			},
 		},
 	}
+
+	originalExecutor := shell.Default
+	defer func() { shell.Default = originalExecutor }()
+	mockExpectedOutput := []shell.MockCommand{
+		{Pattern: "lsblk", Output: LsblkOutput, Error: nil},
+	}
+	shell.Default = shell.NewMockExecutor(mockExpectedOutput)
 
 	app := tview.NewApplication()
 	refreshTitleCalled := false
@@ -405,6 +464,14 @@ func TestDiskView_Constants(t *testing.T) {
 }
 
 func TestDiskView_PopulateBlockDeviceOptions(t *testing.T) {
+
+	originalExecutor := shell.Default
+	defer func() { shell.Default = originalExecutor }()
+	mockExpectedOutput := []shell.MockCommand{
+		{Pattern: "lsblk", Output: LsblkOutput, Error: nil},
+	}
+	shell.Default = shell.NewMockExecutor(mockExpectedOutput)
+
 	dv := New()
 
 	err := dv.populateBlockDeviceOptions()
@@ -434,6 +501,13 @@ func TestDiskView_HandleInput_WithNilEvent(t *testing.T) {
 			},
 		},
 	}
+
+	originalExecutor := shell.Default
+	defer func() { shell.Default = originalExecutor }()
+	mockExpectedOutput := []shell.MockCommand{
+		{Pattern: "lsblk", Output: LsblkOutput, Error: nil},
+	}
+	shell.Default = shell.NewMockExecutor(mockExpectedOutput)
 
 	app := tview.NewApplication()
 	mockFunc := func() {}
@@ -468,6 +542,13 @@ func TestDiskView_Title_InManualMode(t *testing.T) {
 			},
 		},
 	}
+
+	originalExecutor := shell.Default
+	defer func() { shell.Default = originalExecutor }()
+	mockExpectedOutput := []shell.MockCommand{
+		{Pattern: "lsblk", Output: LsblkOutput, Error: nil},
+	}
+	shell.Default = shell.NewMockExecutor(mockExpectedOutput)
 
 	app := tview.NewApplication()
 	mockFunc := func() {}
@@ -511,6 +592,13 @@ func TestDiskView_HandleInput_InManualMode(t *testing.T) {
 			},
 		},
 	}
+
+	originalExecutor := shell.Default
+	defer func() { shell.Default = originalExecutor }()
+	mockExpectedOutput := []shell.MockCommand{
+		{Pattern: "lsblk", Output: LsblkOutput, Error: nil},
+	}
+	shell.Default = shell.NewMockExecutor(mockExpectedOutput)
 
 	app := tview.NewApplication()
 	mockFunc := func() {}
