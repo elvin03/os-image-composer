@@ -92,7 +92,7 @@ build:
         echo "$BUILD_DATE" > /tmp/build_date
 
     # Build with variables instead of cat substitution
-    RUN VERSION=$(cat /tmp/version) && \
+    RUN VERSION=$(cat /tmp/version.txt) && \
         COMMIT_SHA=$(cat /tmp/commit_sha) && \
         BUILD_DATE=$(cat /tmp/build_date) && \
         CGO_ENABLED=0 GOARCH=amd64 GOOS=linux \
