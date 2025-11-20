@@ -257,12 +257,13 @@ func ResolveDependencies(requested []ospackage.PackageInfo, all []ospackage.Pack
 
 	perlBaseCount := 0
 	for _, queuepkg := range byNameVer {
-		if queuepkg.Name == "perl-base" {
+		if queuepkg.Name == "gcc-12-base" {
 			perlBaseCount++
-			log.Debugf("%s %s -> %s", queuepkg.Name, queuepkg.Version, filepath.Base(queuepkg.URL))
+			baseUrl, _ := extractRepoBase(queuepkg.URL)
+			log.Debugf("%s %s -> %s", queuepkg.Name, queuepkg.Version, baseUrl)
 		}
 	}
-	log.Infof("need a total of %d DEBs (no dependencies), perl-base packages: %d", len(byNameVer), perlBaseCount)
+	log.Infof("need a total of %d DEBs (no dependencies), gcc-12-base packages: %d", len(byNameVer), perlBaseCount)
 
 	neededSet := make(map[string]struct{})
 	queue := make([]ospackage.PackageInfo, 0, len(requested))
@@ -285,7 +286,8 @@ func ResolveDependencies(requested []ospackage.PackageInfo, all []ospackage.Pack
 	log.Infof("need a total of %d DEBs (no dependencies))", len(queue))
 
 	for _, queuepkg := range queue {
-		log.Debugf("%s %s -> %s", queuepkg.Name, queuepkg.Version, filepath.Base(queuepkg.URL))
+		baseUrl, _ := extractRepoBase(queuepkg.URL)
+		log.Debugf("%s %s -> %s", queuepkg.Name, queuepkg.Version, baseUrl)
 	}
 
 	for len(queue) > 0 {
@@ -659,8 +661,9 @@ func ResolveTopPackageConflicts(want string, all []ospackage.PackageInfo) (ospac
 		}
 		// 2) exact name, e.g. acct
 		if pi.Name == want {
-			if pi.Name == "perl-base" {
-				log.Debugf("perl-base in top candidate package %s %s -> %s", pi.Name, pi.Version, filepath.Base(pi.URL))
+			if pi.Name == "gcc-12-base" {
+				baseUrl, _ := extractRepoBase(pi.URL)
+				log.Debugf("gcc-12-base in top candidate package %s %s -> %s", pi.Name, pi.Version, baseUrl)
 			}
 			candidates = append(candidates, pi)
 			continue
@@ -855,11 +858,12 @@ func resolveMultiCandidates(parentPkg ospackage.PackageInfo, candidates []ospack
 	//yockgen: start
 	depNm := candidates[0].Name
 	//parentFilter := "libva-drm2" //"ca-certificates"     //"systemd-ukify"
-	depFilter := "libegl-mesa0" //"ca-certificates-shared" //"systemd"
+	depFilter := "gcc-12-base" //"ca-certificates-shared" //"systemd"
 	// if strings.HasPrefix(parentPkg.Name, parentFilter) && depNm == depFilter {
 	if depNm == depFilter {
 		fmt.Printf("versionConstraints, hasVersionConstraint = extractVersionRequirement(%#v, %#v)\n", parentPkg.RequiresVer, candidates[0].Name)
-		fmt.Printf("\nyockgen99: parent=%s \n", parentPkg.Name)
+		parentBaseUrl, _ := extractRepoBase(parentPkg.URL)
+		fmt.Printf("\nyockgen99: parent=%s %s %s\n", parentPkg.Name, parentPkg.Version, parentBaseUrl)
 		for _, req := range parentPkg.RequiresVer {
 			if strings.HasPrefix(req, depNm) {
 				fmt.Printf(" required=%s\n", req)
@@ -869,13 +873,15 @@ func resolveMultiCandidates(parentPkg ospackage.PackageInfo, candidates []ospack
 			fmt.Printf("yockgen99: no version specified for %s\n\n", candidates[0].Name)
 			//display all candidates
 			for _, itx := range candidates {
-				fmt.Printf("yockgen99: candidate=%s %s %s\n", itx.Name, itx.Version, itx.URL)
+				baseUrl, _ := extractRepoBase(itx.URL)
+				fmt.Printf("yockgen99: candidate=%s %s %s\n", itx.Name, itx.Version, baseUrl)
 			}
 		} else {
 
 			//display all candidates
 			for _, itx := range candidates {
-				fmt.Printf("yockgen99: candidate=%s %s %s\n", itx.Name, itx.Version, itx.URL)
+				baseUrl, _ := extractRepoBase(itx.URL)
+				fmt.Printf("yockgen99: candidate=%s %s %s\n", itx.Name, itx.Version, baseUrl)
 			}
 			fmt.Printf("yockgen99: version constraints for %s are: ", candidates[0].Name)
 			for _, vc := range versionConstraints {
@@ -936,20 +942,41 @@ func resolveMultiCandidates(parentPkg ospackage.PackageInfo, candidates []ospack
 			}
 		}
 
-		// Priority 1: return first match from same repo
+		// Compare versions between sameRepoMatches[0] and otherRepoMatches[0]
+		// Return whichever has the latest version, with sameRepoMatches[0] as tiebreaker
+		if len(sameRepoMatches) > 0 && len(otherRepoMatches) > 0 {
+			cmp := compareVersions(sameRepoMatches[0].Version, otherRepoMatches[0].Version)
+			if cmp >= 0 { // sameRepo version >= otherRepo version (tiebreaker favors sameRepo)
+				if depNm == depFilter {
+					baseUrl, _ := extractRepoBase(sameRepoMatches[0].URL)
+					fmt.Printf("yockgen99: choosen candidate same (latest/tie): %s %s %s\n\n", sameRepoMatches[0].Name, sameRepoMatches[0].Version, baseUrl)
+				}
+				return sameRepoMatches[0], nil
+			} else { // otherRepo version > sameRepo version
+				if depNm == depFilter {
+					baseUrl, _ := extractRepoBase(otherRepoMatches[0].URL)
+					fmt.Printf("yockgen99: choosen candidate other (latest): %s %s %s\n\n", otherRepoMatches[0].Name, otherRepoMatches[0].Version, baseUrl)
+				}
+				return otherRepoMatches[0], nil
+			}
+		}
+
+		// Priority 1: return first match from same repo (if only sameRepo has matches)
 		if len(sameRepoMatches) > 0 {
 			// if strings.HasPrefix(parentPkg.Name, parentFilter) && depNm == depFilter {
 			if depNm == depFilter {
-				fmt.Printf("yockgen99: choosen candidate same: %s %s %s\n\n", sameRepoMatches[0].Name, sameRepoMatches[0].Version, sameRepoMatches[0].URL)
+				baseUrl, _ := extractRepoBase(sameRepoMatches[0].URL)
+				fmt.Printf("yockgen99: choosen candidate same: %s %s %s\n\n", sameRepoMatches[0].Name, sameRepoMatches[0].Version, baseUrl)
 			}
 			return sameRepoMatches[0], nil
 		}
 
-		// Priority 2: return first match from other repos
+		// Priority 2: return first match from other repos (if only otherRepo has matches)
 		if len(otherRepoMatches) > 0 {
 			// if strings.HasPrefix(parentPkg.Name, parentFilter) && depNm == depFilter {
 			if depNm == depFilter {
-				fmt.Printf("yockgen99: choosen candidate other: %s %s %s\n\n", otherRepoMatches[0].Name, otherRepoMatches[0].Version, otherRepoMatches[0].URL)
+				baseUrl, _ := extractRepoBase(otherRepoMatches[0].URL)
+				fmt.Printf("yockgen99: choosen candidate other: %s %s %s\n\n", otherRepoMatches[0].Name, otherRepoMatches[0].Version, baseUrl)
 			}
 			return otherRepoMatches[0], nil
 		}
@@ -976,13 +1003,15 @@ func resolveMultiCandidates(parentPkg ospackage.PackageInfo, candidates []ospack
 	// If only one candidate, return it
 	if len(candidates) == 1 {
 		if depNm == depFilter {
-			fmt.Printf("yockgen99: choosen candidate only candidate: %s %s %s\n\n", candidates[0].Name, candidates[0].Version, candidates[0].URL)
+			baseUrl, _ := extractRepoBase(candidates[0].URL)
+			fmt.Printf("yockgen99: choosen candidate only candidate: %s %s %s\n\n", candidates[0].Name, candidates[0].Version, baseUrl)
 		}
 		return candidates[0], nil
 	}
 
-	// Rule 1: find all candidates with the same base URL and return the latest version
+	// Rule 1: find all candidates with the same base URL and candidates from other repos
 	var sameBaseCandidates []ospackage.PackageInfo
+	var otherBaseCandidates []ospackage.PackageInfo
 	for _, candidate := range candidates {
 		candidateBase, err := extractRepoBase(candidate.URL)
 		if err != nil {
@@ -991,45 +1020,53 @@ func resolveMultiCandidates(parentPkg ospackage.PackageInfo, candidates []ospack
 		// if candidateBase == parentBase {
 		if matchesRepoBase(parentBase, candidateBase) {
 			sameBaseCandidates = append(sameBaseCandidates, candidate)
+		} else {
+			otherBaseCandidates = append(otherBaseCandidates, candidate)
 		}
 	}
 
-	// If we found candidates with the same base URL, return the one with the latest version
-	if len(sameBaseCandidates) > 0 {
-		if len(sameBaseCandidates) == 1 {
+	// Compare latest versions between same base and other base (first element is always latest)
+	// Return whichever has the latest version, with same base as tiebreaker
+	if len(sameBaseCandidates) > 0 && len(otherBaseCandidates) > 0 {
+		cmp := compareVersions(sameBaseCandidates[0].Version, otherBaseCandidates[0].Version)
+		if cmp >= 0 { // sameBase version >= otherBase version (tiebreaker favors sameBase)
 			if depNm == depFilter {
-				fmt.Printf("yockgen99: choosen candidate same no conts: %s %s %s\n\n", sameBaseCandidates[0].Name, sameBaseCandidates[0].Version, sameBaseCandidates[0].URL)
+				baseUrl, _ := extractRepoBase(sameBaseCandidates[0].URL)
+				fmt.Printf("yockgen99: choosen candidate same base (latest/tie): %s %s %s\n\n", sameBaseCandidates[0].Name, sameBaseCandidates[0].Version, baseUrl)
 			}
 			return sameBaseCandidates[0], nil
-		}
-
-		// Find the candidate with the latest version
-		latest := sameBaseCandidates[0]
-		for _, candidate := range sameBaseCandidates[1:] {
-			cmp := compareVersions(candidate.Version, latest.Version)
-			if cmp > 0 {
-				if depNm == depFilter {
-					fmt.Printf("yockgen99: processing candidate latest: %s %s %s\n\n", latest.Name, latest.Version, latest.URL)
-				}
-				latest = candidate
-
-				if depNm == depFilter {
-					fmt.Printf("yockgen99: processing candidate latest replacing: %s %s %s\n\n", latest.Name, latest.Version, latest.URL)
-				}
+		} else { // otherBase version > sameBase version
+			if depNm == depFilter {
+				baseUrl, _ := extractRepoBase(otherBaseCandidates[0].URL)
+				fmt.Printf("yockgen99: choosen candidate other base (latest): %s %s %s\n\n", otherBaseCandidates[0].Name, otherBaseCandidates[0].Version, baseUrl)
 			}
+			return otherBaseCandidates[0], nil
 		}
+	}
 
+	// If we only have candidates with the same base URL, return the first (latest) one
+	if len(sameBaseCandidates) > 0 {
 		if depNm == depFilter {
-			fmt.Printf("yockgen99: choosen candidate latest: %s %s %s\n\n", latest.Name, latest.Version, latest.URL)
+			baseUrl, _ := extractRepoBase(sameBaseCandidates[0].URL)
+			fmt.Printf("yockgen99: choosen candidate same base only: %s %s %s\n\n", sameBaseCandidates[0].Name, sameBaseCandidates[0].Version, baseUrl)
 		}
+		return sameBaseCandidates[0], nil
+	}
 
-		return latest, nil
+	// If we only have candidates from other repos, return the first (latest) one
+	if len(otherBaseCandidates) > 0 {
+		if depNm == depFilter {
+			baseUrl, _ := extractRepoBase(otherBaseCandidates[0].URL)
+			fmt.Printf("yockgen99: choosen candidate other base only: %s %s %s\n\n", otherBaseCandidates[0].Name, otherBaseCandidates[0].Version, baseUrl)
+		}
+		return otherBaseCandidates[0], nil
 	}
 
 	if depNm == depFilter {
-		fmt.Printf("yockgen99: choosen candidate first pick: %s %s %s\n\n", candidates[0].Name, candidates[0].Version, candidates[0].URL)
+		baseUrl, _ := extractRepoBase(candidates[0].URL)
+		fmt.Printf("yockgen99: choosen candidate first pick: %s %s %s\n\n", candidates[0].Name, candidates[0].Version, baseUrl)
 	}
 
-	// Rule 2: If no candidate has the same repo, return the first candidate in other repos
+	// Fallback: return first candidate if no categorization worked
 	return candidates[0], nil
 }

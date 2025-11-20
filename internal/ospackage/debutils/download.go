@@ -357,8 +357,8 @@ func MatchRequested(requests []string, all []ospackage.PackageInfo) ([]ospackage
 	}
 
 	for _, queuepkg := range out {
-		if queuepkg.Name == "perl-base" {
-			log.Debugf("perl-base in top package %s %s -> %s", queuepkg.Name, queuepkg.Version, filepath.Base(queuepkg.URL))
+		if queuepkg.Name == "gcc-12-base" {
+			log.Debugf("gcc-12-base in top package %s %s -> %s", queuepkg.Name, queuepkg.Version, filepath.Base(queuepkg.URL))
 		}
 	}
 
