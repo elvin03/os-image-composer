@@ -86,7 +86,7 @@ systemConfig:
     - platform-observability-agent
     - platform-telemetry-agent
     - platform-update-agent
-    - inbm
+    - in-band-manageability
     - reporting-agent
 
     # tinker tools
@@ -124,10 +124,11 @@ systemConfig:
     - linux-firmware-iwlwifi
     - wireless-regdb
 
-    # os ab update
-    - os-ab-update
+    # os update
+    - os-update
 
     # vpro amt
+    - platform-manageability-agent
     - rpc
     - intel-lms
 
