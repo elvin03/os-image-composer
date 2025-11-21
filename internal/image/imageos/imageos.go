@@ -915,6 +915,13 @@ func updateInitramfs(installRoot, kernelVersion string, template *config.ImageTe
 		cmdParts = append(cmdParts, "--add", "crypt")
 	}
 
+	// Add cut utility for EMT images only
+	if template.Target.OS == "edge-microvisor-toolkit" {
+		log.Debugf("Adding /usr/bin/cut to initramfs for EMT image")
+		cmdParts = append(cmdParts, "--install", "/usr/bin/cut")
+	} else {
+		log.Debugf("Skipping /usr/bin/cut for non-EMT image (OS: %s)", template.Target.OS)
+	}
 	cmdParts = append(cmdParts, "--add", "systemd")
 
 	// Always add USB drivers
@@ -1112,6 +1119,7 @@ func buildUKI(installRoot, kernelPath, initrdPath, cmdlineFile, outputPath strin
 		log.Errorf("Failed to read cmdline file %s: %v", cmdlineFile, err)
 		return fmt.Errorf("failed to read cmdline file: %w", err)
 	}
+
 	cmdlineStr := string(data)
 	if template.IsImmutabilityEnabled() {
 		partData := extractRootHashPH(cmdlineStr)
