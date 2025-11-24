@@ -85,6 +85,7 @@ func PackagesFromMultipleRepos() ([]ospackage.PackageInfo, error) {
 	}
 
 	var allPackages []ospackage.PackageInfo
+	var failedRepos []string
 
 	for i, repoCfg := range RepoCfgs {
 		log.Infof("fetching packages from repository %d: %s (%s)", i+1, repoCfg.Name, repoCfg.PkgList)
@@ -92,6 +93,7 @@ func PackagesFromMultipleRepos() ([]ospackage.PackageInfo, error) {
 		packages, err := ParseRepositoryMetadata(repoCfg.PkgPrefix, repoCfg.PkgList, repoCfg.ReleaseFile, repoCfg.ReleaseSign, repoCfg.PbGPGKey, repoCfg.BuildPath, repoCfg.Arch)
 		if err != nil {
 			log.Warnf("Failed to parse repository %s: %v", repoCfg.Name, err)
+			failedRepos = append(failedRepos, repoCfg.Name)
 			continue // Skip this repository but continue with others
 		}
 
@@ -99,14 +101,20 @@ func PackagesFromMultipleRepos() ([]ospackage.PackageInfo, error) {
 		allPackages = append(allPackages, packages...)
 	}
 
+	// If all repositories failed, return an error
+	if len(failedRepos) == len(RepoCfgs) {
+		return nil, fmt.Errorf("all %d repositories failed to parse", len(RepoCfgs))
+	}
+
 	log.Infof("found total of %d packages from %d repositories", len(allPackages), len(RepoCfgs))
 	return allPackages, nil
 }
 
 // BuildRepoConfigs converts Repository entries to RepoConfig format
-func BuildRepoConfigs(userRepoList []Repository, repoGroup, arch string) ([]RepoConfig, error) {
+func BuildRepoConfigs(userRepoList []Repository, arch string) ([]RepoConfig, error) {
 	var userRepo []RepoConfig
 	for _, repoItem := range userRepoList {
+		connectSuccess := false
 		id := repoItem.ID
 		codename := repoItem.Codename
 		baseURL := repoItem.URL
@@ -140,7 +148,12 @@ func BuildRepoConfigs(userRepoList []Repository, repoGroup, arch string) ([]Repo
 					Arch:         localArch,
 				}
 				userRepo = append(userRepo, repo)
+				connectSuccess = true
 			}
+		}
+
+		if !connectSuccess {
+			return nil, fmt.Errorf("fail connecting to repository %s", baseURL)
 		}
 	}
 
@@ -152,19 +165,29 @@ func UserPackages() ([]ospackage.PackageInfo, error) {
 	log := logger.Logger()
 	log.Infof("fetching packages from %s", "user package list")
 
-	repoList := make([]Repository, len(UserRepo))
+	var repoList []Repository
 	repoGroup := "custrepo"
 	for i, repo := range UserRepo {
-		repoList[i] = Repository{
-			ID:        fmt.Sprintf("%s%d", repoGroup, i+1),
+		// if baseURL is a placeholder, dont process it
+		if repo.URL == "<URL>" || repo.URL == "" {
+			continue
+		}
+		baseURL := strings.TrimPrefix(strings.TrimPrefix(repo.URL, "http://"), "https://")
+		repoList = append(repoList, Repository{
+			ID:        fmt.Sprintf("%s%d", repoGroup+"-"+baseURL, i+1),
 			Codename:  repo.Codename,
 			URL:       repo.URL,
 			PKey:      repo.PKey,
 			Component: repo.Component,
-		}
+		})
 	}
 
-	userRepo, err := BuildRepoConfigs(repoList, repoGroup, Architecture)
+	// If no valid repositories were found (all were placeholders), return empty package list
+	if len(repoList) == 0 {
+		return []ospackage.PackageInfo{}, nil
+	}
+
+	userRepo, err := BuildRepoConfigs(repoList, Architecture)
 	if err != nil {
 		return nil, fmt.Errorf("building user repo configs failed: %w", err)
 	}

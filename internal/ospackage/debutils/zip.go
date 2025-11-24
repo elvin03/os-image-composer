@@ -80,8 +80,8 @@ func DecompressXZ(inFile string, outFile string) ([]string, error) {
 }
 
 func GetPackagesNames(baseURL string, codename string, arch string, component string) (string, error) {
-	// if baseURL is a placeholder, return empty
-	if baseURL == "<URL>" {
+	// if baseURL is a placeholder, dont process it
+	if baseURL == "<URL>" || baseURL == "" {
 		return "", nil
 	}
 	possibleFiles := []string{"Packages.gz", "Packages.xz"}

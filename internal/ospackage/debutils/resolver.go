@@ -16,6 +16,13 @@ import (
 	"github.com/open-edge-platform/os-image-composer/internal/utils/logger"
 )
 
+// VersionConstraint represents a version operator and version pair
+type VersionConstraint struct {
+	Op          string
+	Ver         string
+	Alternative string // Alternative package name for constraints like "logsave | e2fsprogs (<< 1.45.3-1~)"
+}
+
 func GenerateDot(pkgs []ospackage.PackageInfo, file string) error {
 	return nil
 }
@@ -248,8 +255,8 @@ func ResolveDependencies(requested []ospackage.PackageInfo, all []ospackage.Pack
 			byNameVer[key] = pi
 		}
 	}
-
 	neededSet := make(map[string]struct{})
+	resolvedDeps := make(map[string]ospackage.PackageInfo) // Track resolved dependencies for conflict detection
 	queue := make([]ospackage.PackageInfo, 0, len(requested))
 	for _, pi := range requested {
 		if pi.Version != "" {
@@ -281,26 +288,82 @@ func ResolveDependencies(requested []ospackage.PackageInfo, all []ospackage.Pack
 		for _, dep := range cur.Requires {
 
 			depName := CleanDependencyName(dep)
-			if depName == "" || neededSet[depName] != struct{}{} {
+			if depName == "" {
 				continue
 			}
-			if _, seen := neededSet[depName]; seen {
-				// Check if the new package can use the existing package. If it cannot, then error out; otherwise, continue.
-				// get the package from current queue based on name
-				existing := findAllCandidates(depName, queue)
-				if len(existing) > 0 {
-					// check if the existing package can satisfy the version requirement
-					_, err := resolveMultiCandidates(cur, existing)
-					if err != nil {
-						// get require version
-						var requiredVer string
-						for _, req := range cur.RequiresVer {
-							if strings.Contains(req, depName) {
-								requiredVer = req
-								break
+			if resolvedPkg, seen := resolvedDeps[depName]; seen {
+				// Dependency already resolved - check for version conflicts
+
+				// Check if this is a direct dependency without constraints
+				isDirect := hasDirectDependency(cur.Requires, depName)
+
+				// Extract version constraints for this dependency from current package
+				versionConstraints, hasVersionConstraint := extractVersionRequirement(cur.RequiresVer, depName)
+
+				// If it's a direct dependency, ignore version constraints from alternatives
+				if isDirect && hasVersionConstraint {
+					// Filter out constraints that come from alternatives (keep only direct constraints)
+					var directConstraints []VersionConstraint
+					for _, constraint := range versionConstraints {
+						// If constraint has alternatives, it's from an alternative requirement
+						if constraint.Alternative == "" {
+							directConstraints = append(directConstraints, constraint)
+						}
+					}
+					versionConstraints = directConstraints
+					hasVersionConstraint = len(directConstraints) > 0
+				}
+
+				if hasVersionConstraint {
+					var requiredVer string
+					var requiredDep string
+					// Check if the already-resolved package satisfies the version constraints
+					constraintsSatisfied := true
+					for _, constraint := range versionConstraints {
+						// Check if main package satisfies constraint
+						mainSatisfied := false
+						if constraint.Op != "" && constraint.Ver != "" {
+							cmp, err := CompareDebianVersions(resolvedPkg.Version, constraint.Ver)
+							if err == nil {
+								switch constraint.Op {
+								case "=":
+									mainSatisfied = (cmp == 0)
+								case "<<", "<":
+									mainSatisfied = (cmp < 0)
+								case "<=":
+									mainSatisfied = (cmp <= 0)
+								case ">>", ">":
+									mainSatisfied = (cmp > 0)
+								case ">=":
+									mainSatisfied = (cmp >= 0)
+								}
 							}
 						}
-						return nil, fmt.Errorf("conflicting package dependencies: %s_%s requires %s, but %s_%s is to be installed", cur.Name, cur.Version, requiredVer, existing[0].Name, existing[0].Version)
+
+						// If main package doesn't satisfy and we have alternatives, check them
+						alternativeSatisfied := false
+						if !mainSatisfied && constraint.Alternative != "" {
+							alternatives := strings.Split(constraint.Alternative, "|")
+							for _, altName := range alternatives {
+								altName = strings.TrimSpace(altName)
+								if _, altSeen := resolvedDeps[altName]; altSeen {
+									// Alternative package is resolved, check if it satisfies (no version constraint for alternatives)
+									alternativeSatisfied = true
+									break
+								}
+							}
+						}
+
+						if !mainSatisfied && !alternativeSatisfied {
+							constraintsSatisfied = false
+							requiredVer = constraint.Ver
+							requiredDep = depName
+							break
+						}
+					}
+
+					if !constraintsSatisfied {
+						return nil, fmt.Errorf("conflicting package dependencies: %s_%s requires %s_%s, but %s_%s is already installed", cur.Name, cur.Version, requiredDep, requiredVer, resolvedPkg.Name, resolvedPkg.Version)
 					}
 				}
 				continue
@@ -317,12 +380,41 @@ func ResolveDependencies(requested []ospackage.PackageInfo, all []ospackage.Pack
 					continue
 				}
 				queue = append(queue, chosenCandidate)
+				resolvedDeps[depName] = chosenCandidate // Track resolved dependency
 				AddParentChildPair(cur, chosenCandidate, &parentChildPairs)
 				continue
 			} else {
-				log.Warnf("no candidates found for dependency %q of package %q", depName, cur.Name)
-				gotMissingPkg = true
-				AddParentMissingChildPair(cur, depName+"(missing)", &parentChildPairs)
+				// No candidates for primary dependency, check for alternatives
+				versionConstraints, _ := extractVersionRequirement(cur.RequiresVer, depName)
+				alternativeResolved := false
+				for _, constraint := range versionConstraints {
+					if constraint.Alternative != "" {
+						alternatives := strings.Split(constraint.Alternative, "|")
+						for _, altName := range alternatives {
+							altName = strings.TrimSpace(altName)
+							altCandidates := findAllCandidates(altName, all)
+							if len(altCandidates) >= 1 {
+								chosenCandidate, err := resolveMultiCandidates(cur, altCandidates)
+								if err == nil {
+									queue = append(queue, chosenCandidate)
+									resolvedDeps[altName] = chosenCandidate // Track resolved alternative dependency
+									AddParentChildPair(cur, chosenCandidate, &parentChildPairs)
+									alternativeResolved = true
+									break
+								}
+							}
+						}
+						if alternativeResolved {
+							break
+						}
+					}
+				}
+
+				if !alternativeResolved {
+					log.Warnf("no candidates found for dependency %q of package %q", depName, cur.Name)
+					gotMissingPkg = true
+					AddParentMissingChildPair(cur, depName+"(missing)", &parentChildPairs)
+				}
 				continue
 			}
 		}
@@ -353,9 +445,9 @@ func getFullUrl(filePath string, baseUrl string) (string, error) {
 	return fullURL, nil
 }
 
-// compareDebianVersions compares two Debian version strings.
+// CompareDebianVersions compares two Debian version strings.
 // Returns -1 if a < b, 0 if a == b, 1 if a > b.
-func compareDebianVersions(a, b string) (int, error) {
+func CompareDebianVersions(a, b string) (int, error) {
 	// Empty-version handling: empty < any non-empty
 	if a == "" && b == "" {
 		return 0, nil
@@ -622,7 +714,7 @@ func compareVersions(v1, v2 string) int {
 	}
 	ver1 := extractVersion(v1)
 	ver2 := extractVersion(v2)
-	cmp, _ := compareDebianVersions(ver1, ver2)
+	cmp, _ := CompareDebianVersions(ver1, ver2)
 	return cmp
 }
 
@@ -638,12 +730,18 @@ func ResolveTopPackageConflicts(want string, all []ospackage.PackageInfo) (ospac
 		// 2) exact name, e.g. acct
 		if pi.Name == want {
 			candidates = append(candidates, pi)
-			break
+			continue
 		}
 		// 3) prefix by want-version ("acl-")
 		if strings.HasPrefix(pi.Name, want+"-") {
-			candidates = append(candidates, pi)
-			continue
+			// Extract string after "-" and compare with pi.Version
+			if dashIdx := strings.LastIndex(want, "-"); dashIdx != -1 {
+				verStr := want[dashIdx+1:]
+				if strings.Contains(pi.Version, verStr) {
+					candidates = append(candidates, pi)
+					continue
+				}
+			}
 		}
 		// 4) prefix by want.release ("acl-2.3.1-2.")
 		if strings.HasPrefix(pi.Name, want+".") {
@@ -695,6 +793,11 @@ func findAllCandidates(depName string, all []ospackage.PackageInfo) []ospackage.
 		}
 	}
 
+	// Sort by version (highest version first)
+	sort.Slice(candidates, func(i, j int) bool {
+		return compareVersions(candidates[i].URL, candidates[j].URL) > 0
+	})
+
 	return candidates
 }
 
@@ -712,18 +815,32 @@ func extractRepoBase(rawURL string) (string, error) {
 		return "", fmt.Errorf("URL does not contain /pool/: %s", rawURL)
 	}
 
-	// Rebuild base URL: scheme + host + prefix before /pool/
-	base := fmt.Sprintf("%s://%s%s/", u.Scheme, u.Host, parts[0])
+	// Rebuild base URL: scheme + host + prefix before /pool/ (without trailing slash)
+	base := fmt.Sprintf("%s://%s%s", u.Scheme, u.Host, parts[0])
 	return base, nil
 }
 
-func extractVersionRequirement(reqVers []string, depName string) (op string, ver string, found bool) {
+// hasDirectDependency checks if a dependency appears as a direct requirement (not in alternatives)
+func hasDirectDependency(requires []string, depName string) bool {
+	for _, req := range requires {
+		cleanReq := CleanDependencyName(req)
+		if cleanReq == depName {
+			return true
+		}
+	}
+	return false
+}
+
+func extractVersionRequirement(reqVers []string, depName string) ([]VersionConstraint, bool) {
+	var constraints []VersionConstraint
+	found := false
+
 	for _, reqVer := range reqVers {
 		reqVer = strings.TrimSpace(reqVer)
 
 		// Handle alternatives (|) - check if our depName is in any of the alternatives
 		alternatives := strings.Split(reqVer, "|")
-		for _, alt := range alternatives {
+		for i, alt := range alternatives {
 			alt = strings.TrimSpace(alt)
 
 			// Check if this alternative starts with the dependency name we're looking for
@@ -732,46 +849,123 @@ func extractVersionRequirement(reqVers []string, depName string) (op string, ver
 				continue // Skip to next alternative
 			}
 
-			// Found our dependency in this alternative, now extract version constraint
-			// Find version constraint inside parentheses
+			// Found our dependency in this alternative, now extract version constraints
+			// Find all version constraints inside parentheses (can be multiple separated by commas)
 			if idx := strings.Index(alt, "("); idx != -1 {
 				verConstraint := alt[idx+1:]
 				if idx2 := strings.Index(verConstraint, ")"); idx2 != -1 {
 					verConstraint = verConstraint[:idx2]
 				}
 
-				// Split into operator and version
-				parts := strings.Fields(verConstraint)
-				if len(parts) == 2 {
-					op := parts[0]
-					ver := parts[1]
-					return op, ver, true
+				// Handle multiple constraints separated by commas
+				constraintParts := strings.Split(verConstraint, ",")
+				for _, constraintPart := range constraintParts {
+					constraintPart = strings.TrimSpace(constraintPart)
+					// Split into operator and version
+					parts := strings.Fields(constraintPart)
+					if len(parts) == 2 {
+						// Collect alternative package names (all alternatives except the current one)
+						var altNames []string
+						for j, altPkg := range alternatives {
+							if j != i {
+								altNames = append(altNames, strings.TrimSpace(CleanDependencyName(altPkg)))
+							}
+						}
+						constraint := VersionConstraint{
+							Op:          parts[0],
+							Ver:         parts[1],
+							Alternative: strings.Join(altNames, "|"),
+						}
+						constraints = append(constraints, constraint)
+						found = true
+					}
+				}
+			} else {
+				// No version constraint, but we have alternatives
+				if len(alternatives) > 1 {
+					// Collect alternative package names (all alternatives except the current one)
+					var altNames []string
+					for j, altPkg := range alternatives {
+						if j != i {
+							altNames = append(altNames, strings.TrimSpace(CleanDependencyName(altPkg)))
+						}
+					}
+					constraint := VersionConstraint{
+						Alternative: strings.Join(altNames, "|"),
+					}
+					constraints = append(constraints, constraint)
 				}
 			}
 
-			// If we found the dependency but no version constraint, return found=false
-			return "", "", false
+			// If we found the dependency but no version constraint, still mark as found
+			if !found {
+				found = true
+			}
 		}
 	}
 
-	return "", "", false
+	return constraints, found
+}
+
+// matchesRepoBase checks if candidateBase matches any of the parent repo bases
+func matchesRepoBase(parentBase []string, candidateBase string) bool {
+	for _, pBase := range parentBase {
+		if candidateBase == pBase {
+			return true
+		}
+	}
+	return false
 }
 
 func resolveMultiCandidates(parentPkg ospackage.PackageInfo, candidates []ospackage.PackageInfo) (ospackage.PackageInfo, error) {
-	parentBase, err := extractRepoBase(parentPkg.URL)
+	parent, err := extractRepoBase(parentPkg.URL)
 	if err != nil {
 		return ospackage.PackageInfo{}, fmt.Errorf("failed to extract repo base from parent package URL: %w", err)
+	}
+	// Extract parent repo base and handle potential multiple repo configurations
+	var imageBase []string
+	if len(RepoCfgs) > 0 {
+		for _, repocfg := range RepoCfgs {
+			if repocfg.PkgPrefix != "" {
+				imageBase = append(imageBase, repocfg.PkgPrefix)
+			}
+		}
+	}
+	if len(imageBase) == 0 && RepoCfg.PkgPrefix != "" {
+		imageBase = append(imageBase, RepoCfg.PkgPrefix)
+	}
+
+	var parentBase []string
+	// check if parent part of base
+	if matchesRepoBase(imageBase, parent) {
+		parentBase = imageBase
+	} else {
+		parentBase = []string{parent}
 	}
 
 	/////////////////////////////////////
 	//A: if version is specified
 	/////////////////////////////////////
 	// All candidates have the same .Name, so just use candidates[0].Name for version extraction
-	op := ""
-	ver := ""
+	var versionConstraints []VersionConstraint
 	hasVersionConstraint := false
 	if len(candidates) > 0 {
-		op, ver, hasVersionConstraint = extractVersionRequirement(parentPkg.RequiresVer, candidates[0].Name)
+		depName := candidates[0].Name
+		isDirect := hasDirectDependency(parentPkg.Requires, depName)
+
+		versionConstraints, hasVersionConstraint = extractVersionRequirement(parentPkg.RequiresVer, depName)
+
+		// If it's a direct dependency, ignore version constraints from alternatives
+		if isDirect && hasVersionConstraint {
+			var directConstraints []VersionConstraint
+			for _, constraint := range versionConstraints {
+				if constraint.Alternative == "" {
+					directConstraints = append(directConstraints, constraint)
+				}
+			}
+			versionConstraints = directConstraints
+			hasVersionConstraint = len(directConstraints) > 0
+		}
 	}
 
 	if hasVersionConstraint {
@@ -785,28 +979,46 @@ func resolveMultiCandidates(parentPkg ospackage.PackageInfo, candidates []ospack
 				continue
 			}
 
-			// Check if version constraint is satisfied
-			cmp, err := compareDebianVersions(candidate.Version, ver)
-			if err != nil {
-				continue
+			// Check if all version constraints are satisfied
+			allConstraintsSatisfied := true
+			for _, constraint := range versionConstraints {
+				// Check if main package (candidate) satisfies constraint
+				mainSatisfied := false
+				if constraint.Op != "" && constraint.Ver != "" {
+					cmp, err := CompareDebianVersions(candidate.Version, constraint.Ver)
+					if err == nil {
+						switch constraint.Op {
+						case "=":
+							mainSatisfied = (cmp == 0)
+						case "<<", "<":
+							mainSatisfied = (cmp < 0)
+						case "<=":
+							mainSatisfied = (cmp <= 0)
+						case ">>", ">":
+							mainSatisfied = (cmp > 0)
+						case ">=":
+							mainSatisfied = (cmp >= 0)
+						}
+					}
+				} else {
+					// No version constraint, satisfied by default
+					mainSatisfied = true
+				}
+
+				// If main package doesn't satisfy and we have alternatives, check if this is acceptable
+				// In candidate selection, we should NOT mark alternatives as satisfied automatically
+				// since we're evaluating the specific candidate for the main package
+				alternativeSatisfied := false
+
+				if !mainSatisfied && !alternativeSatisfied {
+					allConstraintsSatisfied = false
+					break
+				}
 			}
 
-			versionMatches := false
-			switch op {
-			case "=":
-				versionMatches = (cmp == 0)
-			case "<<", "<":
-				versionMatches = (cmp < 0)
-			case "<=":
-				versionMatches = (cmp <= 0)
-			case ">>", ">":
-				versionMatches = (cmp > 0)
-			case ">=":
-				versionMatches = (cmp >= 0)
-			}
-
-			if versionMatches {
-				if candidateBase == parentBase {
+			if allConstraintsSatisfied {
+				// if candidateBase == parentBase {
+				if matchesRepoBase(parentBase, candidateBase) {
 					sameRepoMatches = append(sameRepoMatches, candidate)
 				} else {
 					otherRepoMatches = append(otherRepoMatches, candidate)
@@ -814,17 +1026,35 @@ func resolveMultiCandidates(parentPkg ospackage.PackageInfo, candidates []ospack
 			}
 		}
 
-		// Priority 1: return first match from same repo
+		// Compare versions between sameRepoMatches[0] and otherRepoMatches[0]
+		// Return whichever has the latest version, with sameRepoMatches[0] as tiebreaker
+		if len(sameRepoMatches) > 0 && len(otherRepoMatches) > 0 {
+			cmp := compareVersions(sameRepoMatches[0].Version, otherRepoMatches[0].Version)
+			if cmp >= 0 { // sameRepo version >= otherRepo version (tiebreaker favors sameRepo)
+				return sameRepoMatches[0], nil
+			} else { // otherRepo version > sameRepo version
+				return otherRepoMatches[0], nil
+			}
+		}
+
+		// Priority 1: return first match from same repo (if only sameRepo has matches)
 		if len(sameRepoMatches) > 0 {
 			return sameRepoMatches[0], nil
 		}
 
-		// Priority 2: return first match from other repos
+		// Priority 2: return first match from other repos (if only otherRepo has matches)
 		if len(otherRepoMatches) > 0 {
 			return otherRepoMatches[0], nil
 		}
 
-		return ospackage.PackageInfo{}, fmt.Errorf("no candidates satisfy version constraint = %s%s", op, ver)
+		constraintStr := ""
+		for i, vc := range versionConstraints {
+			if i > 0 {
+				constraintStr += ", "
+			}
+			constraintStr += vc.Op + vc.Ver
+		}
+		return ospackage.PackageInfo{}, fmt.Errorf("no candidates satisfy version constraints: %s", constraintStr)
 	}
 
 	/////////////////////////////////////
@@ -841,36 +1071,43 @@ func resolveMultiCandidates(parentPkg ospackage.PackageInfo, candidates []ospack
 		return candidates[0], nil
 	}
 
-	// Rule 1: find all candidates with the same base URL and return the latest version
+	// Rule 1: find all candidates with the same base URL and candidates from other repos
 	var sameBaseCandidates []ospackage.PackageInfo
+	var otherBaseCandidates []ospackage.PackageInfo
 	for _, candidate := range candidates {
 		candidateBase, err := extractRepoBase(candidate.URL)
 		if err != nil {
 			continue
 		}
-		if candidateBase == parentBase {
+		// if candidateBase == parentBase {
+		if matchesRepoBase(parentBase, candidateBase) {
 			sameBaseCandidates = append(sameBaseCandidates, candidate)
+		} else {
+			otherBaseCandidates = append(otherBaseCandidates, candidate)
 		}
 	}
 
-	// If we found candidates with the same base URL, return the one with the latest version
-	if len(sameBaseCandidates) > 0 {
-		if len(sameBaseCandidates) == 1 {
+	// Compare latest versions between same base and other base (first element is always latest)
+	// Return whichever has the latest version, with same base as tiebreaker
+	if len(sameBaseCandidates) > 0 && len(otherBaseCandidates) > 0 {
+		cmp := compareVersions(sameBaseCandidates[0].Version, otherBaseCandidates[0].Version)
+		if cmp >= 0 { // sameBase version >= otherBase version (tiebreaker favors sameBase)
 			return sameBaseCandidates[0], nil
+		} else { // otherBase version > sameBase version
+			return otherBaseCandidates[0], nil
 		}
-
-		// Find the candidate with the latest version
-		latest := sameBaseCandidates[0]
-		for _, candidate := range sameBaseCandidates[1:] {
-			cmp := compareVersions(candidate.Version, latest.Version)
-			if cmp > 0 {
-				latest = candidate
-			}
-		}
-
-		return latest, nil
 	}
 
-	// Rule 2: If no candidate has the same repo, return the first candidate in other repos
+	// If we only have candidates with the same base URL, return the first (latest) one
+	if len(sameBaseCandidates) > 0 {
+		return sameBaseCandidates[0], nil
+	}
+
+	// If we only have candidates from other repos, return the first (latest) one
+	if len(otherBaseCandidates) > 0 {
+		return otherBaseCandidates[0], nil
+	}
+
+	// Fallback: return first candidate if no categorization worked
 	return candidates[0], nil
 }
