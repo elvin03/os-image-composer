@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/open-edge-platform/os-image-composer/internal/config/validate"
 	"github.com/open-edge-platform/os-image-composer/internal/utils/slice"
 )
 
@@ -1463,5 +1464,651 @@ systemConfig:
 	}
 	if !hasUser {
 		t.Error("Expected user-pkg in merged packages")
+	}
+}
+
+func TestValidateImageTemplateJSONBasic(t *testing.T) {
+	validTemplate := `{
+		"image": {"name": "test", "version": "1.0.0"},
+		"target": {"os": "azure-linux", "dist": "azl3", "arch": "x86_64", "imageType": "raw"},
+		"systemConfig": {"name": "default", "packages": ["filesystem"]}
+	}`
+
+	err := validate.ValidateImageTemplateJSON([]byte(validTemplate))
+	if err != nil {
+		t.Errorf("valid template should pass validation: %v", err)
+	}
+
+	// Invalid template JSON (missing required fields)
+	invalidTemplate := `{
+		"image": {"name": "test"},
+		"target": {"os": "azure-linux"}
+	}`
+
+	err = validate.ValidateImageTemplateJSON([]byte(invalidTemplate))
+	if err == nil {
+		t.Errorf("invalid template should fail validation")
+	}
+}
+
+func TestValidateUserTemplateJSON(t *testing.T) {
+	// Minimal valid user template
+	validUserTemplate := `{
+		"image": {"name": "test", "version": "1.0.0"},
+		"target": {"os": "azure-linux", "dist": "azl3", "arch": "x86_64", "imageType": "raw"}
+	}`
+
+	err := validate.ValidateUserTemplateJSON([]byte(validUserTemplate))
+	if err != nil {
+		t.Errorf("valid user template should pass validation: %v", err)
+	}
+
+	// Completely invalid JSON
+	invalidJSON := `{"invalid": json}`
+
+	err = validate.ValidateUserTemplateJSON([]byte(invalidJSON))
+	if err == nil {
+		t.Errorf("invalid JSON should fail validation")
+	}
+}
+
+func TestValidateConfigJSON(t *testing.T) {
+	// Valid config JSON
+	validConfig := `{
+		"workers": 4,
+		"cache_dir": "/tmp/cache",
+		"work_dir": "/tmp/work",
+		"logging": {"level": "info"}
+	}`
+
+	err := validate.ValidateConfigJSON([]byte(validConfig))
+	if err != nil {
+		t.Errorf("valid config should pass validation: %v", err)
+	}
+
+	// Invalid config JSON
+	invalidConfig := `{
+		"workers": "not_a_number",
+		"cache_dir": 123
+	}`
+
+	err = validate.ValidateConfigJSON([]byte(invalidConfig))
+	if err == nil {
+		t.Errorf("invalid config should fail validation")
+	}
+}
+
+func TestValidateAgainstSchemaWithEmptyRef(t *testing.T) {
+	validData := `{"workers": 4, "cache_dir": "/tmp", "work_dir": "/tmp", "logging": {"level": "info"}}`
+
+	// Test with empty ref (should use root schema)
+	err := validate.ValidateAgainstSchema("test-schema", []byte(`{"type": "object"}`), []byte(validData), "")
+	if err != nil {
+		t.Logf("ValidateAgainstSchema with empty ref: %v", err)
+	}
+}
+
+func TestValidateAgainstSchemaWithInvalidJSON(t *testing.T) {
+	invalidJSON := `{"invalid": json syntax}`
+	schema := `{"type": "object"}`
+
+	err := validate.ValidateAgainstSchema("test", []byte(schema), []byte(invalidJSON), "")
+	if err == nil {
+		t.Errorf("expected validation error for invalid JSON")
+	}
+	if !strings.Contains(err.Error(), "invalid JSON") {
+		t.Errorf("expected 'invalid JSON' in error message, got: %v", err)
+	}
+}
+
+// Updated tests for Global config
+func TestDefaultGlobalConfig(t *testing.T) {
+	config := DefaultGlobalConfig()
+
+	if config == nil {
+		t.Fatalf("DefaultGlobalConfig returned nil")
+	}
+
+	if config.Workers != 8 {
+		t.Errorf("expected default workers = 8, got %d", config.Workers)
+	}
+
+	if config.ConfigDir != "./config" {
+		t.Errorf("expected default config dir './config', got '%s'", config.ConfigDir)
+	}
+
+	if config.CacheDir != "./cache" {
+		t.Errorf("expected default cache dir './cache', got '%s'", config.CacheDir)
+	}
+
+	if config.WorkDir != "./workspace" {
+		t.Errorf("expected default work dir './workspace', got '%s'", config.WorkDir)
+	}
+
+	if config.Logging.Level != "info" {
+		t.Errorf("expected default log level 'info', got '%s'", config.Logging.Level)
+	}
+
+	if config.Logging.File != "os-image-composer.log" {
+		t.Errorf("expected default log file 'os-image-composer.log', got '%s'", config.Logging.File)
+	}
+}
+
+// Fix the global singleton test to handle the sync.Once behavior properly
+func TestGlobalSingleton(t *testing.T) {
+	// Test Global() creates a proper config
+	config1 := Global()
+	if config1 == nil {
+		t.Fatalf("Global() returned nil")
+	}
+
+	// Test Global() returns same instance
+	config2 := Global()
+	if config1 != config2 {
+		t.Errorf("Global() should return same instance")
+	}
+
+	// Test SetGlobal - need to reset the once first in a real scenario
+	customConfig := &GlobalConfig{Workers: 99}
+	SetGlobal(customConfig)
+
+	config3 := Global()
+	if config3.Workers != 99 {
+		t.Errorf("SetGlobal didn't update global instance")
+	}
+}
+
+func TestLoadTemplateWithJSONValidation(t *testing.T) {
+	// Test the JSON conversion path in LoadTemplate with all required fields
+	yamlContent := `image:
+  name: json-test
+  version: "1.0.0"
+target:
+  os: azure-linux
+  dist: azl3
+  arch: x86_64
+  imageType: raw
+systemConfig:
+  name: test-config
+  packages:
+    - test-package
+  kernel:
+    version: "6.12"
+    cmdline: "quiet"`
+
+	tmpFile, err := os.CreateTemp("", "test-*.yaml")
+	if err != nil {
+		t.Fatalf("failed to create temp file: %v", err)
+	}
+	if err := tmpFile.Chmod(0600); err != nil {
+		tmpFile.Close()
+		os.Remove(tmpFile.Name())
+		return
+	}
+	defer os.Remove(tmpFile.Name())
+
+	if _, err := tmpFile.WriteString(yamlContent); err != nil {
+		t.Fatalf("failed to write temp file: %v", err)
+	}
+	tmpFile.Close()
+
+	template, err := LoadTemplate(tmpFile.Name(), false)
+	if err != nil {
+		t.Fatalf("LoadTemplate failed: %v", err)
+	}
+
+	if template.Image.Name != "json-test" {
+		t.Errorf("expected image name 'json-test', got '%s'", template.Image.Name)
+	}
+}
+
+func TestGlobalConfigValidate(t *testing.T) {
+	testCases := []struct {
+		name    string
+		config  GlobalConfig
+		wantErr bool
+	}{
+		{
+			name: "valid config",
+			config: GlobalConfig{
+				Workers:   4,
+				ConfigDir: "/test/config",
+				CacheDir:  "/test/cache",
+				WorkDir:   "/test/work",
+				TempDir:   "/test/temp",
+				Logging:   LoggingConfig{Level: "info"},
+			},
+			wantErr: false,
+		},
+		{
+			name: "zero workers",
+			config: GlobalConfig{
+				Workers:   0,
+				ConfigDir: "/test/config",
+				CacheDir:  "/test/cache",
+				WorkDir:   "/test/work",
+				TempDir:   "/test/temp",
+				Logging:   LoggingConfig{Level: "info"},
+			},
+			wantErr: true,
+		},
+		{
+			name: "too many workers",
+			config: GlobalConfig{
+				Workers:   101,
+				ConfigDir: "/test/config",
+				CacheDir:  "/test/cache",
+				WorkDir:   "/test/work",
+				TempDir:   "/test/temp",
+				Logging:   LoggingConfig{Level: "info"},
+			},
+			wantErr: true,
+		},
+		{
+			name: "empty cache dir",
+			config: GlobalConfig{
+				Workers:   4,
+				ConfigDir: "/test/config",
+				CacheDir:  "",
+				WorkDir:   "/test/work",
+				TempDir:   "/test/temp",
+				Logging:   LoggingConfig{Level: "info"},
+			},
+			wantErr: true,
+		},
+		{
+			name: "empty work dir",
+			config: GlobalConfig{
+				Workers:   4,
+				ConfigDir: "/test/config",
+				CacheDir:  "/test/cache",
+				WorkDir:   "",
+				TempDir:   "/test/temp",
+				Logging:   LoggingConfig{Level: "info"},
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid log level",
+			config: GlobalConfig{
+				Workers:   4,
+				ConfigDir: "/test/config",
+				CacheDir:  "/test/cache",
+				WorkDir:   "/test/work",
+				TempDir:   "/test/temp",
+				Logging:   LoggingConfig{Level: "invalid"},
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.config.Validate()
+			if tc.wantErr && err == nil {
+				t.Errorf("expected validation error but got none")
+			}
+			if !tc.wantErr && err != nil {
+				t.Errorf("unexpected validation error: %v", err)
+			}
+		})
+	}
+}
+
+func TestLoadGlobalConfigFromFile(t *testing.T) {
+	// Create test config file
+	configContent := "workers: 6\n" +
+		"config_dir: /custom/config\n" +
+		"cache_dir: /custom/cache\n" +
+		"work_dir: /custom/work\n" +
+		"temp_dir: /custom/temp\n" +
+		"logging:\n" +
+		"  level: debug\n" +
+		"  file: /var/log/test.log\n"
+
+	tmpFile, err := os.CreateTemp("", "test-config-*.yml")
+	if err != nil {
+		t.Fatalf("failed to create temp file: %v", err)
+	}
+	if err := tmpFile.Chmod(0600); err != nil {
+		tmpFile.Close()
+		os.Remove(tmpFile.Name())
+		return
+	}
+	defer os.Remove(tmpFile.Name())
+
+	if _, err := tmpFile.WriteString(configContent); err != nil {
+		t.Fatalf("failed to write temp file: %v", err)
+	}
+	tmpFile.Close()
+
+	config, err := LoadGlobalConfig(tmpFile.Name())
+	if err != nil {
+		t.Fatalf("LoadGlobalConfig failed: %v", err)
+	}
+
+	if config.Workers != 6 {
+		t.Errorf("expected workers = 6, got %d", config.Workers)
+	}
+
+	if config.ConfigDir != "/custom/config" {
+		t.Errorf("expected config_dir = '/custom/config', got '%s'", config.ConfigDir)
+	}
+
+	if config.Logging.Level != "debug" {
+		t.Errorf("expected log level = 'debug', got '%s'", config.Logging.Level)
+	}
+
+	if config.Logging.File != "/var/log/test.log" {
+		t.Errorf("expected log file = '/var/log/test.log', got '%s'", config.Logging.File)
+	}
+}
+
+func TestLoadGlobalConfigWithEmptyPath(t *testing.T) {
+	config, err := LoadGlobalConfig("")
+	if err != nil {
+		t.Errorf("LoadGlobalConfig with empty path should return defaults: %v", err)
+	}
+
+	// Should return default config
+	defaultConfig := DefaultGlobalConfig()
+	if config.Workers != defaultConfig.Workers {
+		t.Errorf("expected default workers, got %d", config.Workers)
+	}
+}
+
+func TestLoadGlobalConfigWithNonExistentFile(t *testing.T) {
+	config, err := LoadGlobalConfig("/nonexistent/file.yml")
+	if err != nil {
+		t.Errorf("LoadGlobalConfig with non-existent file should return defaults: %v", err)
+	}
+
+	// Should return default config when file doesn't exist
+	if config.Workers != 8 {
+		t.Errorf("expected default workers = 8, got %d", config.Workers)
+	}
+}
+
+func TestLoadGlobalConfigWithInvalidYAML(t *testing.T) {
+	invalidYAML := `workers: not_a_number
+cache_dir: [invalid, yaml, structure]
+logging:
+  level: debug
+  - invalid: structure`
+
+	tmpFile, err := os.CreateTemp("", "test-invalid-*.yml")
+	if err != nil {
+		t.Fatalf("failed to create temp file: %v", err)
+	}
+	if err := tmpFile.Chmod(0600); err != nil {
+		tmpFile.Close()
+		os.Remove(tmpFile.Name())
+		return
+	}
+	defer os.Remove(tmpFile.Name())
+
+	if _, err := tmpFile.WriteString(invalidYAML); err != nil {
+		t.Fatalf("failed to write temp file: %v", err)
+	}
+	tmpFile.Close()
+
+	_, err = LoadGlobalConfig(tmpFile.Name())
+	if err == nil {
+		t.Errorf("expected error for invalid YAML")
+	}
+}
+
+func TestLoadGlobalConfigWithUnsupportedFormat(t *testing.T) {
+	// Test with .json file (not supported)
+	tmpFile, err := os.CreateTemp("", "test-*.json")
+	if err != nil {
+		t.Fatalf("failed to create temp file: %v", err)
+	}
+	if err := tmpFile.Chmod(0600); err != nil {
+		tmpFile.Close()
+		os.Remove(tmpFile.Name())
+		return
+	}
+	defer os.Remove(tmpFile.Name())
+
+	jsonContent := `{"workers": 4, "cache_dir": "/test"}`
+	if _, err := tmpFile.WriteString(jsonContent); err != nil {
+		t.Fatalf("failed to write temp file: %v", err)
+	}
+	tmpFile.Close()
+
+	_, err = LoadGlobalConfig(tmpFile.Name())
+	if err == nil {
+		t.Errorf("expected error for unsupported file format")
+	}
+	if !strings.Contains(err.Error(), "unsupported config file format") {
+		t.Errorf("expected unsupported format error, got: %v", err)
+	}
+}
+
+func TestGlobalConfigSave(t *testing.T) {
+	config := &GlobalConfig{
+		Workers:   6,
+		ConfigDir: "/save/config",
+		CacheDir:  "/save/cache",
+		WorkDir:   "/save/work",
+		TempDir:   "/save/temp",
+		Logging: LoggingConfig{
+			Level: "warn",
+		},
+	}
+
+	tmpFile, err := os.CreateTemp("", "test-save-*.yml")
+	if err != nil {
+		t.Fatalf("failed to create temp file: %v", err)
+	}
+	if err := tmpFile.Chmod(0600); err != nil {
+		tmpFile.Close()
+		os.Remove(tmpFile.Name())
+		return
+	}
+	defer os.Remove(tmpFile.Name())
+	tmpFile.Close()
+
+	// Use SaveGlobalConfig method
+	if err := config.SaveGlobalConfig(tmpFile.Name()); err != nil {
+		t.Fatalf("SaveGlobalConfig failed: %v", err)
+	}
+
+	// Load it back and verify
+	loadedConfig, err := LoadGlobalConfig(tmpFile.Name())
+	if err != nil {
+		t.Fatalf("failed to load saved config: %v", err)
+	}
+
+	if loadedConfig.Workers != config.Workers {
+		t.Errorf("workers not preserved: expected %d, got %d", config.Workers, loadedConfig.Workers)
+	}
+
+	if loadedConfig.ConfigDir != config.ConfigDir {
+		t.Errorf("config_dir not preserved: expected '%s', got '%s'", config.ConfigDir, loadedConfig.ConfigDir)
+	}
+}
+
+func TestParseYAMLTemplateValidationErrors(t *testing.T) {
+	// Template that fails schema validation
+	invalidTemplate := []byte(`
+image:
+  name: test
+  version: 1.0.0
+target:
+  os: azure-linux
+  dist: azl3
+  arch: x86_64
+  imageType: raw
+systemConfig:
+  name: test
+  packages: "should_be_array_not_string"
+`)
+
+	_, err := parseYAMLTemplate(invalidTemplate, true)
+	if err == nil {
+		t.Errorf("expected validation error for invalid template")
+	}
+
+	// Should fail even without validation if user template validation fails
+	_, err = parseYAMLTemplate(invalidTemplate, false)
+	if err == nil {
+		t.Errorf("expected validation error even without full validation")
+	}
+}
+
+func TestGlobalConfigSaveWithCreateDirectory(t *testing.T) {
+	config := &GlobalConfig{
+		Workers:   4,
+		ConfigDir: "/test/config", // Add missing ConfigDir
+		CacheDir:  "/test/cache",
+		WorkDir:   "/test/work",
+		TempDir:   "/test/temp", // Use a valid temp dir
+		Logging:   LoggingConfig{Level: "info"},
+	}
+
+	// Create a path in a subdirectory
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "subdir", "config.yml")
+
+	err := config.SaveGlobalConfig(configPath)
+	if err != nil {
+		t.Fatalf("SaveGlobalConfig should create directories: %v", err)
+	}
+
+	// Verify file was created
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		t.Errorf("config file was not created")
+	}
+}
+
+func TestSaveGlobalConfigWithComments(t *testing.T) {
+	config := DefaultGlobalConfig()
+	config.Logging.File = "custom.log"
+
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "commented-config.yml")
+
+	if err := config.SaveGlobalConfigWithComments(configPath); err != nil {
+		t.Fatalf("SaveGlobalConfigWithComments failed: %v", err)
+	}
+
+	contents, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatalf("failed to read commented config: %v", err)
+	}
+
+	text := string(contents)
+	if !strings.Contains(text, "# OS Image Composer - Global Configuration") {
+		t.Fatalf("expected commented config header, got: %s", text)
+	}
+
+	if !strings.Contains(text, "file: \"custom.log\"") {
+		t.Fatalf("expected logging file entry in commented config, got: %s", text)
+	}
+}
+
+func TestLoadTemplateGlobalVariables(t *testing.T) {
+	// Test that LoadTemplate sets global variables
+	yamlContent := `image:
+  name: global-test
+  version: 1.0.0
+target:
+  os: wind-river-elxr
+  dist: elxr12
+  arch: x86_64
+  imageType: raw
+systemConfig:
+  name: test-config
+  packages:
+    - test-package
+  kernel:
+    version: "6.12"
+    cmdline: "quiet"`
+
+	tmpFile, err := os.CreateTemp("", "test-*.yml")
+	if err != nil {
+		t.Fatalf("failed to create temp file: %v", err)
+	}
+	if err := tmpFile.Chmod(0600); err != nil {
+		tmpFile.Close()
+		os.Remove(tmpFile.Name())
+		return
+	}
+	defer os.Remove(tmpFile.Name())
+
+	if _, err := tmpFile.WriteString(yamlContent); err != nil {
+		t.Fatalf("failed to write temp file: %v", err)
+	}
+	tmpFile.Close()
+
+	template, err := LoadTemplate(tmpFile.Name(), false)
+	if err != nil {
+		t.Fatalf("LoadTemplate failed: %v", err)
+	}
+
+	// Check that global variables were set
+	if template.Target.OS != "wind-river-elxr" {
+		t.Errorf("expected TargetOs = 'wind-river-elxr', got '%s'", template.Target.OS)
+	}
+	if template.Target.Dist != "elxr12" {
+		t.Errorf("expected TargetDist = 'elxr12', got '%s'", template.Target.Dist)
+	}
+	if template.Target.Arch != "x86_64" {
+		t.Errorf("expected TargetArch = 'x86_64', got '%s'", template.Target.Arch)
+	}
+	if template.Target.ImageType != "raw" {
+		t.Errorf("expected TargetImageType = 'raw', got '%s'", template.Target.ImageType)
+	}
+
+	if template.Image.Name != "global-test" {
+		t.Errorf("expected image name 'global-test', got '%s'", template.Image.Name)
+	}
+}
+
+// Additional benchmark tests
+func BenchmarkLoadTemplate(b *testing.B) {
+	yamlContent := `image:
+  name: benchmark-test
+  version: 1.0.0
+target:
+  os: azure-linux
+  dist: azl3
+  arch: x86_64
+  imageType: raw
+systemConfig:
+  name: benchmark-config
+  packages:
+    - package1
+    - package2
+    - package3
+  kernel:
+    version: "6.12"
+    cmdline: "quiet"
+`
+
+	tmpFile, err := os.CreateTemp("", "benchmark-*.yml")
+	if err != nil {
+		b.Fatalf("failed to create temp file: %v", err)
+	}
+	if err := tmpFile.Chmod(0600); err != nil {
+		tmpFile.Close()
+		os.Remove(tmpFile.Name())
+		return
+	}
+	defer os.Remove(tmpFile.Name())
+
+	if _, err := tmpFile.WriteString(yamlContent); err != nil {
+		b.Fatalf("failed to write temp file: %v", err)
+	}
+	tmpFile.Close()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := LoadTemplate(tmpFile.Name(), false)
+		if err != nil {
+			b.Fatalf("LoadTemplate failed: %v", err)
+		}
 	}
 }
