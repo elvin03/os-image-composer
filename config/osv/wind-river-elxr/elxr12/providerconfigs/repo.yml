@@ -28,7 +28,7 @@ repositories:
   - name: "bianca-updates"
     type: "deb"  # Repository type: rpm or deb
     # baseURL: "https://mirror.elxr.dev/elxr/dists/aria/main"
-    baseURL: "https://mirror.elxr.dev/elxr/dists"
+    baseURL: "https://mirror.elxr.dev/elxr"
     pkgPrefix: "https://mirror.elxr.dev/elxr/"
     releaseFile: "https://mirror.elxr.dev/elxr/dists/bianca-updates/Release"
     releaseSign: "https://mirror.elxr.dev/elxr/dists/bianca-updates/Release.gpg"
