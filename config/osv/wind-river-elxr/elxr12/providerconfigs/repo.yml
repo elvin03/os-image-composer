@@ -38,3 +38,15 @@ repositories:
     enabled: true
     component: "main"  # Repository component/section identifier
     buildPath: "./builds/elxr12/updates"  # Will be replaced with temp_dir/builds/elxr12 at runtime
+  - name: "bookworm"
+    type: "deb"
+    baseURL: "https://deb.debian.org/debian"
+    pkgPrefix: "https://deb.debian.org/debian/"
+    releaseFile: "https://deb.debian.org/debian/dists/bookworm/Release"
+    releaseSign: "https://deb.debian.org/debian/dists/bookworm/Release.gpg"
+    pbGPGKey: "https://ftp-master.debian.org/keys/archive-key-12.asc"  # Debian 12 key
+    gpgCheck: true
+    repoGPGCheck: true
+    enabled: true
+    component: "main"
+    buildPath: "./builds/debian/bookworm"
