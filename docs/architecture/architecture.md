@@ -195,6 +195,9 @@ Security Objectives <image-composition-tool-security-objectives>
 Build Process <os-image-composer-build-process>
 image-manifest-specification
 Coding Style Guide <os-image-composer-coding-style>
+os-image-composer-caching.md
+os-image-composer-multi-repo-support.md
+os-image-composer-templates.md
 
 :::
 hide_directive-->
