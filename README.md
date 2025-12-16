@@ -471,7 +471,7 @@ os-image-composer build --[TAB]
 
 Written in the YAML format, templates define the requirements for building an OS image. The template structure enables you to define key parameters, such as the OS distribution, version, architecture, software packages, output format, and kernel configuration. The image template format is validated against a JSON schema to check syntax and semantics before building the image.
 
-If you are an entry-level user or have straightforward requirements, you can reuse the basic template and add the rquired packages. If you are addressing an advanced use case with, for instance, robust security requirements, you can edit the template to define disc and partition layouts, and other settings for security.
+If you are an entry-level user or have straightforward requirements, you can reuse the basic template and add the rquired packages. If you are addressing an advanced use case with, for instance, robust security requirements, you can edit the template to define disk and partition layouts, and other settings for security.
 
 ```yaml
 image:
