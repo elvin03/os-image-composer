@@ -209,17 +209,22 @@ systemConfig:
 	}
 }
 
-func TestMergeSystemConfigWithImmutability(t *testing.T) {
+func TestMergeSystemConfigWithImmutabilityExplicitFalse(t *testing.T) {
 	defaultConfig := SystemConfig{
 		Name:         "default",
 		Immutability: ImmutabilityConfig{Enabled: true},
 		Packages:     []string{"base-package"},
 	}
 
+	// User explicitly provides immutability config with secure boot settings
+	// This represents a user who explicitly configured immutability
 	userConfig := SystemConfig{
-		Name:         "user",
-		Immutability: ImmutabilityConfig{Enabled: false},
-		Packages:     []string{"user-package"},
+		Name: "user",
+		Immutability: ImmutabilityConfig{
+			Enabled:         false,
+			SecureBootDBKey: "/path/to/key", // This makes it clear user provided config
+		},
+		Packages: []string{"user-package"},
 	}
 
 	merged := mergeSystemConfig(defaultConfig, userConfig)
@@ -230,6 +235,205 @@ func TestMergeSystemConfigWithImmutability(t *testing.T) {
 
 	if merged.Name != "user" {
 		t.Errorf("expected merged name to be 'user', got %s", merged.Name)
+	}
+}
+
+func TestMergeSystemConfigWithEmptyImmutability(t *testing.T) {
+	defaultConfig := SystemConfig{
+		Name:         "default",
+		Immutability: ImmutabilityConfig{Enabled: true},
+		Packages:     []string{"base-package"},
+	}
+
+	// User config with no immutability configuration (zero values)
+	userConfig := SystemConfig{
+		Name:     "user",
+		Packages: []string{"user-package"},
+		// Note: No Immutability field set, so it gets zero values
+	}
+
+	merged := mergeSystemConfig(defaultConfig, userConfig)
+
+	// Should keep default immutability since user didn't specify it
+	if merged.Immutability.Enabled != true {
+		t.Errorf("expected merged immutability to be true (default preserved), got %t", merged.Immutability.Enabled)
+	}
+
+	if merged.Name != "user" {
+		t.Errorf("expected merged name to be 'user', got %s", merged.Name)
+	}
+}
+
+func TestLoadAndMergeTemplateWithRealYAML(t *testing.T) {
+	// Setup temporary config directory
+	tempDir := t.TempDir()
+
+	// Save original global config
+	originalGlobal := Global()
+	defer SetGlobal(originalGlobal)
+
+	// Set new global config with temp dir
+	newGlobal := DefaultGlobalConfig()
+	newGlobal.ConfigDir = tempDir
+	SetGlobal(newGlobal)
+
+	// Create directory structure for default config
+	osDistDir := filepath.Join(tempDir, "osv", "wind-river-elxr", "elxr12")
+	defaultConfigDir := filepath.Join(osDistDir, "imageconfigs", "defaultconfigs")
+	if err := os.MkdirAll(defaultConfigDir, 0755); err != nil {
+		t.Fatalf("Failed to create directory structure: %v", err)
+	}
+
+	// Create default config with immutability enabled
+	defaultConfigContent := `
+image:
+  name: default-image
+  version: "12.0.0"
+target:
+  os: wind-river-elxr
+  dist: elxr12
+  arch: x86_64
+  imageType: raw
+systemConfig:
+  name: default-system
+  immutability:
+    enabled: true
+  packages:
+    - default-pkg
+`
+	defaultConfigFile := filepath.Join(defaultConfigDir, "default-raw-x86_64.yml")
+	if err := os.WriteFile(defaultConfigFile, []byte(defaultConfigContent), 0644); err != nil {
+		t.Fatalf("Failed to write default config file: %v", err)
+	}
+
+	// Create user template without immutability section
+	userConfigContent := `
+image:
+  name: user-image
+  version: "12.0.0"
+target:
+  os: wind-river-elxr
+  dist: elxr12
+  arch: x86_64
+  imageType: raw
+systemConfig:
+  name: user-system
+  packages:
+    - user-pkg
+`
+	userConfigFile := filepath.Join(tempDir, "user-config.yml")
+	if err := os.WriteFile(userConfigFile, []byte(userConfigContent), 0644); err != nil {
+		t.Fatalf("Failed to write user config file: %v", err)
+	}
+
+	// Test LoadAndMergeTemplate
+	template, err := LoadAndMergeTemplate(userConfigFile)
+	if err != nil {
+		t.Fatalf("LoadAndMergeTemplate failed: %v", err)
+	}
+
+	// Verify that immutability is preserved from default (true) since user didn't specify it
+	if !template.IsImmutabilityEnabled() {
+		t.Errorf("Expected immutability to be enabled (from default), but got %t", template.IsImmutabilityEnabled())
+	}
+}
+
+func TestLoadAndMergeTemplateImmutabilityAutoDisabled(t *testing.T) {
+	// Setup temporary config directory
+	tempDir := t.TempDir()
+
+	// Save original global config
+	originalGlobal := Global()
+	defer SetGlobal(originalGlobal)
+
+	// Set new global config with temp dir
+	newGlobal := DefaultGlobalConfig()
+	newGlobal.ConfigDir = tempDir
+	SetGlobal(newGlobal)
+
+	// Create directory structure for default config
+	osDistDir := filepath.Join(tempDir, "osv", "wind-river-elxr", "elxr12")
+	defaultConfigDir := filepath.Join(osDistDir, "imageconfigs", "defaultconfigs")
+	if err := os.MkdirAll(defaultConfigDir, 0755); err != nil {
+		t.Fatalf("Failed to create directory structure: %v", err)
+	}
+
+	// Create default config with immutability enabled and hash partition
+	defaultConfigContent := `
+image:
+  name: default-image
+  version: "12.0.0"
+target:
+  os: wind-river-elxr
+  dist: elxr12
+  arch: x86_64
+  imageType: raw
+disk:
+  name: default-disk
+  partitions:
+    - id: root
+      mountPoint: /
+    - id: roothashmap
+      type: linux
+      mountPoint: none
+systemConfig:
+  name: default-system
+  immutability:
+    enabled: true
+  packages:
+    - default-pkg
+`
+	defaultConfigFile := filepath.Join(defaultConfigDir, "default-raw-x86_64.yml")
+	if err := os.WriteFile(defaultConfigFile, []byte(defaultConfigContent), 0644); err != nil {
+		t.Fatalf("Failed to write default config file: %v", err)
+	}
+
+	// Create user template with custom disk (no hash partition) and no immutability section
+	userConfigContent := `
+image:
+  name: user-image
+  version: "12.0.0"
+target:
+  os: wind-river-elxr
+  dist: elxr12
+  arch: x86_64
+  imageType: raw
+disk:
+  name: user-disk
+  partitions:
+    - id: root
+      mountPoint: /
+systemConfig:
+  name: user-system
+  packages:
+    - user-pkg
+`
+	userConfigFile := filepath.Join(tempDir, "user-config.yml")
+	if err := os.WriteFile(userConfigFile, []byte(userConfigContent), 0644); err != nil {
+		t.Fatalf("Failed to write user config file: %v", err)
+	}
+
+	// Test LoadAndMergeTemplate
+	template, err := LoadAndMergeTemplate(userConfigFile)
+	if err != nil {
+		t.Fatalf("LoadAndMergeTemplate failed: %v", err)
+	}
+
+	// Verify that immutability was automatically disabled due to missing hash partition
+	if template.IsImmutabilityEnabled() {
+		t.Errorf("Expected immutability to be disabled due to missing hash partition, but got %t", template.IsImmutabilityEnabled())
+	}
+
+	// Verify that user's disk config is preserved (no hash partition)
+	hasHashPartition := false
+	for _, partition := range template.Disk.Partitions {
+		if partition.ID == "roothashmap" || partition.ID == "hash" {
+			hasHashPartition = true
+			break
+		}
+	}
+	if hasHashPartition {
+		t.Error("Expected user disk config to be preserved (no hash partition)")
 	}
 }
 
