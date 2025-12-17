@@ -134,6 +134,9 @@ func MergeConfigurations(userTemplate, defaultTemplate *ImageTemplate) (*ImageTe
 
 	log.Infof("Successfully merged user and default configurations")
 
+	// Validate immutability configuration and fix if needed
+	validateAndFixImmutabilityConfig(&mergedTemplate)
+
 	// Debug mode: Pretty print the merged template
 	if IsDebugMode() {
 		pretty, err := json.MarshalIndent(mergedTemplate, "", "  ")
@@ -170,8 +173,14 @@ func mergeSystemConfig(defaultConfig, userConfig SystemConfig) SystemConfig {
 		merged.Initramfs.Template = userConfig.Initramfs.Template
 	}
 
-	// Merge immutability config
-	merged.Immutability = mergeImmutabilityConfig(defaultConfig.Immutability, userConfig.Immutability)
+	// Merge immutability config - only if user provided some immutability configuration
+	if isEmptyImmutabilityConfig(userConfig.Immutability) {
+		// User didn't provide any immutability config, keep default
+		merged.Immutability = defaultConfig.Immutability
+	} else {
+		// User provided some immutability config, merge it
+		merged.Immutability = mergeImmutabilityConfig(defaultConfig.Immutability, userConfig.Immutability)
+	}
 
 	// Merge users config
 	if len(userConfig.Users) > 0 {
@@ -198,16 +207,34 @@ func mergeSystemConfig(defaultConfig, userConfig SystemConfig) SystemConfig {
 	return merged
 }
 
+// isEmptyImmutabilityConfig checks if the immutability config is effectively empty
+// (i.e., user didn't provide any meaningful immutability configuration)
+// We only consider it empty if ALL fields are zero/empty values
+func isEmptyImmutabilityConfig(config ImmutabilityConfig) bool {
+	// If user has ANY secure boot configuration, they provided config
+	if config.SecureBootDBKey != "" ||
+		config.SecureBootDBCrt != "" ||
+		config.SecureBootDBCer != "" {
+		return false
+	}
+
+	// If enabled is true, they explicitly set it
+	if config.Enabled {
+		return false
+	}
+
+	// If enabled is false and no secure boot config, we assume it's empty
+	// This is a limitation - we can't distinguish between explicit false vs zero-value false
+	// But this covers the most common case where users don't specify immutability at all
+	return true
+}
+
 // mergeImmutabilityConfig merges immutability configurations including secure boot settings
 func mergeImmutabilityConfig(defaultImmutability, userImmutability ImmutabilityConfig) ImmutabilityConfig {
 	merged := defaultImmutability // Start with default
 
-	// User configuration takes precedence
-	// If user explicitly sets enabled (either true or false), use that value
-	// Otherwise, keep the default value
-	if userImmutability.Enabled != defaultImmutability.Enabled {
-		merged.Enabled = userImmutability.Enabled
-	}
+	// User provided immutability config, so merge all fields
+	merged.Enabled = userImmutability.Enabled
 
 	// Merge secure boot configuration - user values override defaults
 	if userImmutability.SecureBootDBKey != "" {
@@ -443,6 +470,38 @@ func isEmptySystemConfig(config SystemConfig) bool {
 
 func isEmptyBootloader(bootloader Bootloader) bool {
 	return bootloader.BootType == "" && bootloader.Provider == ""
+}
+
+// validateAndFixImmutabilityConfig checks if immutability is enabled but hash partition is missing
+// If so, it automatically disables immutability with a warning
+func validateAndFixImmutabilityConfig(template *ImageTemplate) {
+	// Only validate if immutability is enabled
+	if !template.IsImmutabilityEnabled() {
+		return
+	}
+
+	// Check if hash partition exists (required for dm-verity)
+	hasHashPartition := false
+	for _, partition := range template.Disk.Partitions {
+		// Look for partitions that could be used as hash partition
+		// Common IDs: "roothashmap", "hash", or partitions with mountPoint "none"
+		if partition.ID == "roothashmap" || partition.ID == "hash" ||
+			(partition.MountPoint == "none" && partition.Type == "linux") {
+			hasHashPartition = true
+			break
+		}
+	}
+
+	// If no hash partition found, disable immutability with warning
+	if !hasHashPartition {
+		log.Warnf("Immutability is enabled but no hash partition found for dm-verity.")
+		log.Warnf("Automatically disabling immutability to prevent build failure.")
+		log.Warnf("To enable immutability, add a hash partition with ID 'roothashmap' or 'hash' and mountPoint 'none'.")
+
+		// Disable immutability
+		template.SystemConfig.Immutability.Enabled = false
+		log.Infof("Immutability has been disabled due to missing hash partition.")
+	}
 }
 
 // LoadAndMergeTemplate loads a user template and merges it with the appropriate default config
