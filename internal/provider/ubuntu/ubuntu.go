@@ -233,12 +233,14 @@ func (p *ubuntu) downloadImagePkgs(template *config.ImageTemplate) error {
 		log.Infof("Repository %d: %s (%s)", i+1, cfg.Name, cfg.PkgList)
 	}
 
-	//template.FullPkgList, err = debutils.DownloadPackages(pkgList, pkgCacheDir, "")
 	fullPkgList, fullPkgListBom, err := debutils.DownloadPackagesComplete(pkgList, pkgCacheDir, "")
+	if err != nil {
+		return fmt.Errorf("failed to download packages: %w", err)
+	}
 	template.FullPkgList = fullPkgList
 	template.FullPkgListBom = fullPkgListBom
 
-	return err
+	return nil
 }
 
 func loadRepoConfig(repoUrl string, arch string) ([]debutils.RepoConfig, error) {

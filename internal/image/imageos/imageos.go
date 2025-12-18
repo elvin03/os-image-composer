@@ -19,6 +19,7 @@ import (
 	"github.com/open-edge-platform/os-image-composer/internal/image/imagesign"
 	"github.com/open-edge-platform/os-image-composer/internal/ospackage"
 	"github.com/open-edge-platform/os-image-composer/internal/ospackage/debutils"
+	"github.com/open-edge-platform/os-image-composer/internal/ospackage/rpmutils"
 	"github.com/open-edge-platform/os-image-composer/internal/utils/file"
 	"github.com/open-edge-platform/os-image-composer/internal/utils/logger"
 	"github.com/open-edge-platform/os-image-composer/internal/utils/mount"
@@ -188,6 +189,13 @@ func (imageOs *ImageOs) InstallImageOs(diskPathIdMap map[string]string) (version
 		return
 	}
 
+	log.Infof("Image SBOM generation...")
+	versionInfo, err = imageOs.generateSBOM(imageOs.installRoot, imageOs.template)
+	if err != nil {
+		err = fmt.Errorf("generating SBOM failed: %w", err)
+		return
+	}
+
 	if err = imagesecure.ConfigImageSecurity(imageOs.installRoot, imageOs.template); err != nil {
 		err = fmt.Errorf("failed to configure image security: %w", err)
 		return
@@ -199,15 +207,9 @@ func (imageOs *ImageOs) InstallImageOs(diskPathIdMap map[string]string) (version
 		return
 	}
 
+	log.Infof("Configuring Sign Image...")
 	if err = imagesign.SignImage(imageOs.installRoot, imageOs.template); err != nil {
 		err = fmt.Errorf("failed to sign image: %w", err)
-		return
-	}
-
-	log.Infof("Image SBOM generation...")
-	versionInfo, err = imageOs.generateSBOM(imageOs.installRoot, imageOs.template)
-	if err != nil {
-		err = fmt.Errorf("generating SBOM failed: %w", err)
 		return
 	}
 
@@ -1462,7 +1464,14 @@ func configUserStartupScript(installRoot string, user config.UserConfig) error {
 func (imageOs *ImageOs) generateSBOM(installRoot string, template *config.ImageTemplate) (string, error) {
 
 	manifest.DefaultSPDXFile = debutils.GenerateSPDXFileName(template.GetImageName())
-	cmd := "dpkg -l | awk '/^ii/ {print $2}'"
+	pkgType := imageOs.chrootEnv.GetTargetOsPkgType()
+	sBomFNm := rpmutils.GenerateSPDXFileName(template.GetImageName())
+	cmd := "rpm -qa"
+	if pkgType == "deb" {
+		cmd = "dpkg -l | awk '/^ii/ {print $2}'"
+		sBomFNm = debutils.GenerateSPDXFileName(template.GetImageName())
+	}
+	manifest.DefaultSPDXFile = sBomFNm
 
 	result, err := shell.ExecCmd(cmd, true, installRoot, nil)
 	if err != nil {
@@ -1486,7 +1495,15 @@ func (imageOs *ImageOs) generateSBOM(installRoot string, template *config.ImageT
 
 	var finalPkgs []ospackage.PackageInfo
 	for _, pkg := range downloadedPkgs {
-		if installedPkgMap[pkg.Name] {
+		// Normalize package name by removing file extensions
+		normalizedName := pkg.Name
+		if strings.HasSuffix(normalizedName, ".rpm") {
+			normalizedName = strings.TrimSuffix(normalizedName, ".rpm")
+		} else if strings.HasSuffix(normalizedName, ".deb") {
+			normalizedName = strings.TrimSuffix(normalizedName, ".deb")
+		}
+
+		if installedPkgMap[normalizedName] {
 			finalPkgs = append(finalPkgs, pkg)
 		}
 	}
