@@ -4002,12 +4002,15 @@ func TestImageConfigurationWorkflowIntegration(t *testing.T) {
 			// Defer cleanup function to fix permissions
 			defer func() {
 				// Make all files and directories writable before cleanup
-				filepath.Walk(tempDir, func(path string, info os.FileInfo, err error) error {
+				if err := filepath.Walk(tempDir, func(path string, info os.FileInfo, err error) error {
 					if err == nil {
 						os.Chmod(path, 0755)
 					}
 					return nil
-				})
+				}); err != nil {
+					// Log error but don't fail test during cleanup
+					t.Logf("Warning: failed to walk directory during cleanup: %v", err)
+				}
 			}()
 
 			// Test individual components based on template content
@@ -4242,7 +4245,7 @@ func TestSystemConfigurationErrorRecovery(t *testing.T) {
 			// Use t.Cleanup to ensure permissions are fixed before test cleanup
 			t.Cleanup(func() {
 				// Make all files and directories writable recursively
-				filepath.Walk(tempDir, func(path string, info os.FileInfo, err error) error {
+				if err := filepath.Walk(tempDir, func(path string, info os.FileInfo, err error) error {
 					if err == nil {
 						if info.IsDir() {
 							os.Chmod(path, 0755) // rwxr-xr-x for directories
@@ -4251,7 +4254,10 @@ func TestSystemConfigurationErrorRecovery(t *testing.T) {
 						}
 					}
 					return nil
-				})
+				}); err != nil {
+					// Log error but don't fail test during cleanup
+					t.Logf("Warning: failed to walk directory during cleanup: %v", err)
+				}
 				// Make the entire directory writable by owner to ensure cleanup works
 				os.Chmod(tempDir, 0755)
 			})
