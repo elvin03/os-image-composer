@@ -416,12 +416,6 @@ func shouldPrefer(pkg ospackage.PackageInfo) bool {
 	return priority == 990
 }
 
-// isDefaultPriority returns true if the package has default priority (priority = 500)
-func isDefaultPriority(pkg ospackage.PackageInfo) bool {
-	priority := getRepositoryPriority(pkg.URL)
-	return priority == 500 || priority == 0 // 0 is treated as default
-}
-
 // filterCandidatesByPriority filters out blocked packages and applies priority-based sorting
 func filterCandidatesByPriority(candidates []ospackage.PackageInfo) []ospackage.PackageInfo {
 	var filtered []ospackage.PackageInfo
@@ -649,10 +643,21 @@ func ResolveDependencies(requested []ospackage.PackageInfo, all []ospackage.Pack
 					}
 
 					if !constraintsSatisfied {
+						// Check if replacement is allowed - if current constraint has exact version (=)
+						// and resolved package has different version, this is a conflict
+						hasExactVersionConstraint := false
+						for _, constraint := range versionConstraints {
+							if constraint.Op == "=" {
+								hasExactVersionConstraint = true
+								break
+							}
+						}
+
 						// Before throwing error, check if there's a higher priority candidate available
+						// But only allow replacement if we don't have an exact version conflict
 						candidates := findAllCandidates(depName, all)
 
-						if len(candidates) > 0 {
+						if len(candidates) > 0 && !hasExactVersionConstraint {
 							// Find candidates that satisfy the version constraint
 							var satisfyingCandidates []ospackage.PackageInfo
 							for _, candidate := range candidates {
