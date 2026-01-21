@@ -96,7 +96,8 @@ jobs:
               # Extract numeric values using simpler patterns
               OVERALL=$(grep "Overall Coverage:" coverage_report.txt | sed 's/[^0-9.]*\([0-9.]\+\)%.*/\1/')%
               THRESHOLD=$(grep "Threshold:" coverage_report.txt | sed 's/[^0-9.]*\([0-9.]\+\)%.*/\1/')%
-              STATUS=$(grep "Status:" coverage_report.txt | sed 's/[^A-Z]*\([A-Z]\+\).*/\1/')
+              # Get last word on the Status line (PASSED or FAILED)
+              STATUS=$(grep "Status:" coverage_report.txt | awk '{print $NF}')
               
               # Status badge
               if [[ "$STATUS" == "PASSED" ]]; then
