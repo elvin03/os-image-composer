@@ -25,7 +25,7 @@ var newInspector = func() inspector {
 // Output format command flags
 var (
 	outputFormat string = "text" // Output format for the inspection results
-	prettyJSON   bool   = true   // Pretty-print JSON output
+	prettyJSON   bool   = false  // Pretty-print JSON output
 )
 
 // createInspectCommand creates the inspect subcommand
