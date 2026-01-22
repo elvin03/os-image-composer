@@ -298,7 +298,7 @@ packageRepositories:
 
 - Only add repositories from trusted sources
 - Always include GPG keys for repository authentication when available
-- Use `pkey: "[trusted=yes]"` only for internal or highly trusted repositories where GPG verification is not available or needed
+- Use `pkey: "[trusted=yes]"` only when GPG keys are unavailable and the repository is under your organization's direct control
 - Regularly review and update repository configurations
 - Be cautious with repositories that don't provide GPG keys
 
