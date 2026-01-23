@@ -40,12 +40,12 @@ type LoggingConfig struct {
 
 // AIConfig holds AI-powered template generation settings
 type AIConfig struct {
-	Provider     string           `yaml:"provider,omitempty" json:"provider,omitempty"`           // AI provider: "ollama" (default) or "openai"
-	TemplatesDir string           `yaml:"templates_dir,omitempty" json:"templates_dir,omitempty"` // Directory containing template files for RAG
-	Ollama       OllamaConfig     `yaml:"ollama,omitempty" json:"ollama,omitempty"`               // Ollama-specific settings
-	OpenAI       OpenAIConfig     `yaml:"openai,omitempty" json:"openai,omitempty"`               // OpenAI-specific settings
-	Cache        AICacheConfig    `yaml:"cache,omitempty" json:"cache,omitempty"`                 // Embedding cache settings
-	Scoring      AIScoringConfig  `yaml:"scoring,omitempty" json:"scoring,omitempty"`             // Hybrid scoring weights
+	Provider     string          `yaml:"provider,omitempty" json:"provider,omitempty"`           // AI provider: "ollama" (default) or "openai"
+	TemplatesDir string          `yaml:"templates_dir,omitempty" json:"templates_dir,omitempty"` // Directory containing template files for RAG
+	Ollama       OllamaConfig    `yaml:"ollama,omitempty" json:"ollama,omitempty"`               // Ollama-specific settings
+	OpenAI       OpenAIConfig    `yaml:"openai,omitempty" json:"openai,omitempty"`               // OpenAI-specific settings
+	Cache        AICacheConfig   `yaml:"cache,omitempty" json:"cache,omitempty"`                 // Embedding cache settings
+	Scoring      AIScoringConfig `yaml:"scoring,omitempty" json:"scoring,omitempty"`             // Hybrid scoring weights
 }
 
 // OllamaConfig holds Ollama-specific AI settings

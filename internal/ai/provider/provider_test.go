@@ -73,7 +73,7 @@ func TestOllamaEmbed(t *testing.T) {
 			Embedding: []float64{0.1, 0.2, 0.3, 0.4, 0.5},
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	}))
 	defer server.Close()
 
@@ -96,7 +96,7 @@ func TestOllamaEmbed(t *testing.T) {
 func TestOllamaEmbedError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("internal server error"))
+		_, _ = w.Write([]byte("internal server error"))
 	}))
 	defer server.Close()
 
@@ -133,7 +133,7 @@ func TestOllamaChat(t *testing.T) {
 			},
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	}))
 	defer server.Close()
 

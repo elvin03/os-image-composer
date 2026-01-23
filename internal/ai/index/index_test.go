@@ -126,10 +126,10 @@ func TestCalculateKeywordScore(t *testing.T) {
 	}
 
 	tests := []struct {
-		name         string
-		queryTokens  []string
-		expectedMin  float64
-		expectedMax  float64
+		name        string
+		queryTokens []string
+		expectedMin float64
+		expectedMax float64
 	}{
 		{
 			name:        "matching keywords",
