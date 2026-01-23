@@ -10,6 +10,12 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const (
+	// maxEmbeddingPackages limits the number of packages included in searchable text
+	// to avoid excessively long embeddings that may reduce search quality
+	maxEmbeddingPackages = 20
+)
+
 // Metadata represents the optional metadata section in a template.
 type Metadata struct {
 	// Description is a human-readable description for semantic matching
@@ -203,8 +209,8 @@ func (t *TemplateInfo) BuildSearchableText() string {
 	// Packages (limited to avoid too long text)
 	if len(t.Packages) > 0 {
 		pkgList := t.Packages
-		if len(pkgList) > 20 {
-			pkgList = pkgList[:20]
+		if len(pkgList) > maxEmbeddingPackages {
+			pkgList = pkgList[:maxEmbeddingPackages]
 		}
 		parts = append(parts, fmt.Sprintf("Packages: %s", strings.Join(pkgList, ", ")))
 	}

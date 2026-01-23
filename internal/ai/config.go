@@ -210,10 +210,8 @@ func (c Config) Merge(defaults Config) Config {
 	}
 
 	// Merge Cache config
-	if !merged.Cache.Enabled && !defaults.Cache.Enabled {
-		// Both false is valid, but if user didn't set it, use default
-		merged.Cache.Enabled = defaults.Cache.Enabled
-	}
+	// Note: Cache.Enabled defaults to false in Go, so we don't override it here.
+	// If user explicitly sets it to false, we respect that.
 	if merged.Cache.Dir == "" {
 		merged.Cache.Dir = defaults.Cache.Dir
 	}

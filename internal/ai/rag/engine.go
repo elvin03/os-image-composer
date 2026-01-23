@@ -332,7 +332,8 @@ func parseQuery(query string) (tokens []string, packages []string, negativeTerms
 			// Reset negation after capturing the term
 			if i > 0 && i < len(words)-1 {
 				// Check if next word could also be negated (e.g., "without docker and nginx")
-				if words[i] != "and" && words[i] != "or" {
+				nextWord := strings.Trim(words[i+1], ".,!?;:")
+				if nextWord != "and" && nextWord != "or" {
 					inNegation = false
 				}
 			} else {
@@ -354,9 +355,8 @@ func parseQuery(query string) (tokens []string, packages []string, negativeTerms
 		// Add as token if not a common stop word
 		if !isStopWord(word) {
 			tokens = append(tokens, word)
-			if isPackage {
-				// Also add to packages if it matches a pattern
-			}
+			// Package was already added above, no additional action needed
+			_ = isPackage
 		}
 	}
 
