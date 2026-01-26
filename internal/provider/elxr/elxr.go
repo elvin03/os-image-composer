@@ -280,7 +280,7 @@ func loadRepoConfig(repoUrl string, arch string) ([]debutils.RepoConfig, error) 
 	var repoConfigs []debutils.RepoConfig
 
 	// Load provider repo config for elxr - use correct OS name
-	providerConfigs, err := config.LoadProviderRepoConfig(OsName, "elxr12") // Use "wind-river-elxr" and "aria" dist
+	providerConfigs, err := config.LoadProviderRepoConfig(OsName, "elxr12", arch) // Use "wind-river-elxr" and "aria" dist
 	if err != nil {
 		return repoConfigs, fmt.Errorf("failed to load provider repo config: %w", err)
 	}
