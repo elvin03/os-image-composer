@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/open-edge-platform/os-image-composer/internal/ai"
 	"github.com/open-edge-platform/os-image-composer/internal/ai/rag"
@@ -183,6 +185,18 @@ func runGenerate(engine *rag.Engine, query string, templatesDir string) error {
 		return fmt.Errorf("search failed: %w", err)
 	}
 
+	// Check early if output path matches any indexed template
+	if aiOutput != "" {
+		outputPath, err := determineOutputPath(templatesDir)
+		if err != nil {
+			return fmt.Errorf("failed to determine output path: %w", err)
+		}
+		if !checkAndConfirmOverwrite(outputPath, results) {
+			fmt.Println("Aborted. Please re-run with a different --output name.")
+			return nil
+		}
+	}
+
 	if len(results) > 0 {
 		fmt.Printf("\nUsing %d reference templates:\n", min(3, len(results)))
 		for i, result := range results {
@@ -239,9 +253,26 @@ func determineOutputPath(templatesDir string) (string, error) {
 		return "", fmt.Errorf("no output path specified")
 	}
 
-	// Check if it looks like a file path (has extension or path separator)
-	if filepath.Ext(aiOutput) != "" || filepath.Dir(aiOutput) != "." {
-		return aiOutput, nil
+	// Check if it looks like a file path:
+	// - Has a file extension (e.g., .yml, .yaml)
+	// - Has a path separator (absolute or relative path like /path or subdir/name)
+	// - Starts with ./ or ../ (explicit relative path)
+	isPath := filepath.Ext(aiOutput) != "" ||
+		filepath.Dir(aiOutput) != "." ||
+		strings.HasPrefix(aiOutput, "./") ||
+		strings.HasPrefix(aiOutput, "../")
+
+	if isPath {
+		// Convert to absolute path for consistency
+		absPath, err := filepath.Abs(aiOutput)
+		if err != nil {
+			return aiOutput, nil // Fall back to original if Abs fails
+		}
+		// Add .yml extension if not present
+		if filepath.Ext(absPath) == "" {
+			absPath += ".yml"
+		}
+		return absPath, nil
 	}
 
 	// Otherwise treat it as a name, save to templatesDir/<name>.yml
@@ -307,4 +338,43 @@ func min(a, b int) int {
 		return a
 	}
 	return b
+}
+
+// checkAndConfirmOverwrite checks if the output path matches any indexed template
+// and prompts the user for confirmation. Returns true if user wants to continue.
+func checkAndConfirmOverwrite(outputPath string, results []rag.SearchResult) bool {
+	if len(results) == 0 {
+		return true
+	}
+
+	// Get the base name of the output file
+	outputBase := filepath.Base(outputPath)
+
+	// Check against search results
+	for _, result := range results {
+		if result.Template.FileName == outputBase {
+			// Get absolute path of the output for comparison
+			absOutput, err := filepath.Abs(outputPath)
+			if err != nil {
+				absOutput = outputPath
+			}
+
+			fmt.Printf("\n⚠ Warning: Output file '%s' matches an indexed template that was used as a reference.\n", outputBase)
+			fmt.Printf("  This may cause the generated template to influence future generations.\n")
+			fmt.Printf("  Consider using a different name or saving to a location outside '%s'.\n\n", filepath.Dir(absOutput))
+
+			// Prompt user for confirmation
+			fmt.Print("Do you want to continue anyway? [y/N]: ")
+			reader := bufio.NewReader(os.Stdin)
+			response, err := reader.ReadString('\n')
+			if err != nil {
+				return false
+			}
+
+			response = strings.TrimSpace(strings.ToLower(response))
+			return response == "y" || response == "yes"
+		}
+	}
+
+	return true
 }
