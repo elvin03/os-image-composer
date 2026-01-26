@@ -189,6 +189,9 @@ func (p *OllamaProvider) Chat(ctx context.Context, messages []ChatMessage) (stri
 	return chatResp.Message.Content, nil
 }
 
+// DefaultOpenAIBaseURL is the default base URL for OpenAI API.
+const DefaultOpenAIBaseURL = "https://api.openai.com"
+
 // OpenAIProvider implements EmbeddingProvider and ChatProvider using OpenAI API.
 type OpenAIProvider struct {
 	apiKey         string
@@ -196,6 +199,7 @@ type OpenAIProvider struct {
 	chatModel      string
 	client         *http.Client
 	dimensions     int
+	baseURL        string
 }
 
 // NewOpenAIProvider creates a new OpenAI provider.
@@ -205,6 +209,11 @@ func NewOpenAIProvider(embeddingModel, chatModel string, timeout time.Duration) 
 		return nil, fmt.Errorf("OPENAI_API_KEY environment variable is not set")
 	}
 
+	return newOpenAIProviderWithConfig(apiKey, embeddingModel, chatModel, DefaultOpenAIBaseURL, timeout), nil
+}
+
+// newOpenAIProviderWithConfig creates an OpenAI provider with explicit configuration (for testing).
+func newOpenAIProviderWithConfig(apiKey, embeddingModel, chatModel, baseURL string, timeout time.Duration) *OpenAIProvider {
 	// Determine dimensions based on model
 	dimensions := 1536 // default for text-embedding-3-small
 	switch embeddingModel {
@@ -224,7 +233,8 @@ func NewOpenAIProvider(embeddingModel, chatModel string, timeout time.Duration) 
 			Timeout: timeout,
 		},
 		dimensions: dimensions,
-	}, nil
+		baseURL:    baseURL,
+	}
 }
 
 // openAIEmbedRequest is the request body for OpenAI embeddings API.
@@ -255,7 +265,7 @@ func (p *OpenAIProvider) Embed(ctx context.Context, text string) ([]float32, err
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", "https://api.openai.com/v1/embeddings", bytes.NewReader(jsonBody))
+	req, err := http.NewRequestWithContext(ctx, "POST", p.baseURL+"/v1/embeddings", bytes.NewReader(jsonBody))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -328,7 +338,7 @@ func (p *OpenAIProvider) Chat(ctx context.Context, messages []ChatMessage) (stri
 		return "", fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", "https://api.openai.com/v1/chat/completions", bytes.NewReader(jsonBody))
+	req, err := http.NewRequestWithContext(ctx, "POST", p.baseURL+"/v1/chat/completions", bytes.NewReader(jsonBody))
 	if err != nil {
 		return "", fmt.Errorf("failed to create request: %w", err)
 	}

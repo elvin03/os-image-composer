@@ -305,3 +305,300 @@ func TestOllamaProviderBaseURL(t *testing.T) {
 		t.Errorf("expected base URL '%s', got '%s'", baseURL, provider.baseURL)
 	}
 }
+
+// TestOpenAIProviderEmbed tests OpenAI Embed with mock server.
+func TestOpenAIProviderEmbed(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/embeddings" {
+			t.Errorf("expected path /v1/embeddings, got %s", r.URL.Path)
+		}
+
+		if r.Method != "POST" {
+			t.Errorf("expected POST method, got %s", r.Method)
+		}
+
+		// Check authorization header
+		auth := r.Header.Get("Authorization")
+		if auth != "Bearer test-api-key" {
+			t.Errorf("expected Authorization 'Bearer test-api-key', got '%s'", auth)
+		}
+
+		var req openAIEmbedRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Errorf("failed to decode request: %v", err)
+		}
+
+		if req.Model != "text-embedding-3-small" {
+			t.Errorf("expected model 'text-embedding-3-small', got '%s'", req.Model)
+		}
+
+		resp := openAIEmbedResponse{
+			Data: []struct {
+				Embedding []float64 `json:"embedding"`
+			}{
+				{Embedding: []float64{0.1, 0.2, 0.3, 0.4, 0.5}},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	provider := newOpenAIProviderWithConfig("test-api-key", "text-embedding-3-small", "gpt-4o-mini", server.URL, 60*time.Second)
+
+	embedding, err := provider.Embed(context.Background(), "test text")
+	if err != nil {
+		t.Fatalf("Embed failed: %v", err)
+	}
+
+	if len(embedding) != 5 {
+		t.Errorf("expected 5 dimensions, got %d", len(embedding))
+	}
+
+	if embedding[0] != 0.1 {
+		t.Errorf("expected first value 0.1, got %f", embedding[0])
+	}
+}
+
+// TestOpenAIProviderEmbedError tests OpenAI Embed error handling.
+func TestOpenAIProviderEmbedError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		resp := openAIEmbedResponse{
+			Error: &struct {
+				Message string `json:"message"`
+			}{
+				Message: "Rate limit exceeded",
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	provider := newOpenAIProviderWithConfig("test-api-key", "text-embedding-3-small", "gpt-4o-mini", server.URL, 60*time.Second)
+
+	_, err := provider.Embed(context.Background(), "test text")
+	if err == nil {
+		t.Error("expected error, got nil")
+	}
+	if err != nil && !contains(err.Error(), "Rate limit exceeded") {
+		t.Errorf("expected error about rate limit, got: %v", err)
+	}
+}
+
+// TestOpenAIProviderEmbedEmptyResponse tests OpenAI Embed with empty data.
+func TestOpenAIProviderEmbedEmptyResponse(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		resp := openAIEmbedResponse{
+			Data: []struct {
+				Embedding []float64 `json:"embedding"`
+			}{},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	provider := newOpenAIProviderWithConfig("test-api-key", "text-embedding-3-small", "gpt-4o-mini", server.URL, 60*time.Second)
+
+	_, err := provider.Embed(context.Background(), "test text")
+	if err == nil {
+		t.Error("expected error for empty data, got nil")
+	}
+}
+
+// TestOpenAIProviderEmbedInvalidJSON tests OpenAI Embed with invalid JSON.
+func TestOpenAIProviderEmbedInvalidJSON(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte("not valid json"))
+	}))
+	defer server.Close()
+
+	provider := newOpenAIProviderWithConfig("test-api-key", "text-embedding-3-small", "gpt-4o-mini", server.URL, 60*time.Second)
+
+	_, err := provider.Embed(context.Background(), "test text")
+	if err == nil {
+		t.Error("expected error for invalid JSON, got nil")
+	}
+}
+
+// TestOpenAIProviderChat tests OpenAI Chat with mock server.
+func TestOpenAIProviderChat(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/chat/completions" {
+			t.Errorf("expected path /v1/chat/completions, got %s", r.URL.Path)
+		}
+
+		var req openAIChatRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Errorf("failed to decode request: %v", err)
+		}
+
+		if req.Model != "gpt-4o-mini" {
+			t.Errorf("expected model 'gpt-4o-mini', got '%s'", req.Model)
+		}
+
+		resp := openAIChatResponse{
+			Choices: []struct {
+				Message ChatMessage `json:"message"`
+			}{
+				{Message: ChatMessage{Role: "assistant", Content: "Hello from OpenAI!"}},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	provider := newOpenAIProviderWithConfig("test-api-key", "text-embedding-3-small", "gpt-4o-mini", server.URL, 60*time.Second)
+
+	messages := []ChatMessage{
+		{Role: "user", Content: "Hello"},
+	}
+
+	response, err := provider.Chat(context.Background(), messages)
+	if err != nil {
+		t.Fatalf("Chat failed: %v", err)
+	}
+
+	if response != "Hello from OpenAI!" {
+		t.Errorf("expected 'Hello from OpenAI!', got '%s'", response)
+	}
+}
+
+// TestOpenAIProviderChatError tests OpenAI Chat error handling.
+func TestOpenAIProviderChatError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		resp := openAIChatResponse{
+			Error: &struct {
+				Message string `json:"message"`
+			}{
+				Message: "Invalid API key",
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	provider := newOpenAIProviderWithConfig("test-api-key", "text-embedding-3-small", "gpt-4o-mini", server.URL, 60*time.Second)
+
+	messages := []ChatMessage{
+		{Role: "user", Content: "Hello"},
+	}
+
+	_, err := provider.Chat(context.Background(), messages)
+	if err == nil {
+		t.Error("expected error, got nil")
+	}
+}
+
+// TestOpenAIProviderChatEmptyChoices tests OpenAI Chat with empty choices.
+func TestOpenAIProviderChatEmptyChoices(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		resp := openAIChatResponse{
+			Choices: []struct {
+				Message ChatMessage `json:"message"`
+			}{},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	provider := newOpenAIProviderWithConfig("test-api-key", "text-embedding-3-small", "gpt-4o-mini", server.URL, 60*time.Second)
+
+	messages := []ChatMessage{
+		{Role: "user", Content: "Hello"},
+	}
+
+	_, err := provider.Chat(context.Background(), messages)
+	if err == nil {
+		t.Error("expected error for empty choices, got nil")
+	}
+}
+
+// TestOpenAIProviderChatInvalidJSON tests OpenAI Chat with invalid JSON.
+func TestOpenAIProviderChatInvalidJSON(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte("not valid json"))
+	}))
+	defer server.Close()
+
+	provider := newOpenAIProviderWithConfig("test-api-key", "text-embedding-3-small", "gpt-4o-mini", server.URL, 60*time.Second)
+
+	messages := []ChatMessage{
+		{Role: "user", Content: "Hello"},
+	}
+
+	_, err := provider.Chat(context.Background(), messages)
+	if err == nil {
+		t.Error("expected error for invalid JSON, got nil")
+	}
+}
+
+// TestOpenAIProviderModelID tests OpenAI ModelID.
+func TestOpenAIProviderModelID(t *testing.T) {
+	provider := newOpenAIProviderWithConfig("test-api-key", "text-embedding-3-small", "gpt-4o-mini", "http://localhost", 60*time.Second)
+
+	if provider.ModelID() != "text-embedding-3-small" {
+		t.Errorf("expected 'text-embedding-3-small', got '%s'", provider.ModelID())
+	}
+}
+
+// TestOpenAIProviderDimensions tests OpenAI Dimensions for different models.
+func TestOpenAIProviderDimensionsAllModels(t *testing.T) {
+	tests := []struct {
+		model      string
+		dimensions int
+	}{
+		{"text-embedding-3-small", 1536},
+		{"text-embedding-3-large", 3072},
+		{"text-embedding-ada-002", 1536},
+		{"custom-model", 1536}, // default
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.model, func(t *testing.T) {
+			provider := newOpenAIProviderWithConfig("test-api-key", tt.model, "gpt-4o-mini", "http://localhost", 60*time.Second)
+			if provider.Dimensions() != tt.dimensions {
+				t.Errorf("expected %d dimensions, got %d", tt.dimensions, provider.Dimensions())
+			}
+		})
+	}
+}
+
+// TestOpenAIProviderContextCancelled tests context cancellation.
+func TestOpenAIProviderContextCancelled(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(100 * time.Millisecond)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	provider := newOpenAIProviderWithConfig("test-api-key", "text-embedding-3-small", "gpt-4o-mini", server.URL, 60*time.Second)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, err := provider.Embed(ctx, "test text")
+	if err == nil {
+		t.Error("expected error with cancelled context")
+	}
+}
+
+// Helper function for string contains check
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsHelper(s, substr))
+}
+
+func containsHelper(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}
