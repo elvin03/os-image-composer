@@ -226,7 +226,7 @@ echo "Generating binary with go build..."
 go build ./cmd/os-image-composer
 
 build_azl3_raw_image() {
-  echo "Building AZL3 raw Image. (using os-image-composer binary)"
+  echo "Building AZL3 raw Image for ARM64. (using os-image-composer binary)"
   # Ensure we're in the working directory before starting builds
   echo "Ensuring we're in the working directory before starting builds..."
   cd "$WORKING_DIR"
@@ -247,8 +247,6 @@ build_azl3_raw_image() {
         echo "QEMU boot test PASSED for AZL3 raw image"
       else
         echo "QEMU boot test FAILED for AZL3 raw image"
-	echo "Build output:"
-    	echo "$output"
         exit 1
       fi
       # Clean up after QEMU test to free space
@@ -256,6 +254,8 @@ build_azl3_raw_image() {
     fi
   else
     echo "AZL3 raw Image build failed."
+    echo "Build output:"
+    echo "$output"
     exit 1 # Exit with error if build fails
   fi
 }
