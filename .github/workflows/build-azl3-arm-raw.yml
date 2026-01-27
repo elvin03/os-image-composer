@@ -1,4 +1,4 @@
-name: ARM - Build Ubuntu24 Raw Image 
+name: ARM - Build Azure Linux Raw Image 
 on:
   workflow_dispatch:             # Manual runs
     inputs:
