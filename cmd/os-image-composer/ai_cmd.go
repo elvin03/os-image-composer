@@ -14,11 +14,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const (
-	// maxDisplayPackages is the maximum number of packages to display in search results
-	maxDisplayPackages = 5
-)
-
 var (
 	aiProvider     string
 	aiTemplatesDir string
@@ -160,12 +155,7 @@ func runSearch(engine *rag.Engine, query string) error {
 		fmt.Printf("   Distribution: %s, Architecture: %s, Type: %s\n",
 			result.Template.Distribution, result.Template.Architecture, result.Template.ImageType)
 		if len(result.Template.Packages) > 0 {
-			pkgCount := len(result.Template.Packages)
-			if pkgCount > maxDisplayPackages {
-				fmt.Printf("   Packages: %v... (+%d more)\n", result.Template.Packages[:maxDisplayPackages], pkgCount-maxDisplayPackages)
-			} else {
-				fmt.Printf("   Packages: %v\n", result.Template.Packages)
-			}
+			fmt.Printf("   Packages: %v\n", result.Template.Packages)
 		}
 		fmt.Println()
 	}
