@@ -166,11 +166,11 @@ run_qemu_boot_test() {
     IMAGE=\"$IMAGE\"
     RAW_IMAGE=\"$RAW_IMAGE\"
     ORIGINAL_DIR=\"$ORIGINAL_DIR\"
+        #-enable-kvm \\
     
     touch \"\$LOGFILE\" && chmod 666 \"\$LOGFILE\"    
     nohup qemu-system-aarch64 \\
         -m 2048 \\
-        -enable-kvm \\
         -cpu host \\
         -drive if=none,file=\"\$IMAGE\",format=raw,id=nvme0 \\
         -device nvme,drive=nvme0,serial=deadbeef \\
