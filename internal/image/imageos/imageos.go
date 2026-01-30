@@ -906,36 +906,36 @@ func buildImageUKI(installRoot string, template *config.ImageTemplate) error {
 
 		// do checks for file paths
 		if _, err := os.Stat(installRoot); err == nil {
-		log.Infof("Install Root Exists at %s", installRoot)
-		return nil
-		}else {
-		log.Errorf("Install Root does not exist at %s", installRoot)
-		}	
+			log.Infof("Install Root Exists at %s", installRoot)
+			return nil
+		} else {
+			log.Errorf("Install Root does not exist at %s", installRoot)
+		}
 		if _, err := os.Stat(kernelPath); err == nil {
-		log.Infof("kernelPath  Exists at %s", kernelPath)
-		return nil
-		}else {
-		log.Errorf("kernelPath does not exist at %s", kernelPath)
-		}	
+			log.Infof("kernelPath  Exists at %s", kernelPath)
+			return nil
+		} else {
+			log.Errorf("kernelPath does not exist at %s", kernelPath)
+		}
 
 		if _, err := os.Stat(initrdPath); err == nil {
-		log.Infof("initrdPath  Exists at %s", initrdPath)
-		return nil
+			log.Infof("initrdPath  Exists at %s", initrdPath)
+			return nil
 		} else {
-		log.Errorf("initrdPath does not exist at %s", initrdPath)
-		}	
+			log.Errorf("initrdPath does not exist at %s", initrdPath)
+		}
 		if _, err := os.Stat(cmdlineFile); err == nil {
-		log.Infof("cmdlineFile  Exists at %s", cmdlineFile)
-		return nil
+			log.Infof("cmdlineFile  Exists at %s", cmdlineFile)
+			return nil
 		} else {
-		log.Errorf("cmdlineFile does not exist at %s", cmdlineFile)
+			log.Errorf("cmdlineFile does not exist at %s", cmdlineFile)
 		}
 		if _, err := os.Stat(outputPath); err == nil {
-		log.Infof("outputPath  Exists at %s", outputPath)
-		return nil
+			log.Infof("outputPath  Exists at %s", outputPath)
+			return nil
 		} else {
-		log.Errorf("outputPath does not exist at %s", outputPath)
-		}	
+			log.Errorf("outputPath does not exist at %s", outputPath)
+		}
 
 		if err := buildUKI(installRoot, kernelPath, initrdPath, cmdlineFile, outputPath, template); err != nil {
 			return fmt.Errorf("failed to build UKI: %w", err)
@@ -1265,7 +1265,7 @@ func buildUKI(installRoot, kernelPath, initrdPath, cmdlineFile, outputPath strin
 		envVars := []string{"TMPDIR=/tmp"}
 		_, err = shell.ExecCmd(cmd, true, installRoot, envVars)
 		if err != nil {
-			log.Errorf("Failed to build UKI with veritysetup: %v failing command: %s", err,cmd)
+			log.Errorf("Failed to build UKI with veritysetup: %v failing command: %s", err, cmd)
 			err = fmt.Errorf("failed to build UKI with veritysetup: %w", err)
 		}
 		installRoot = backInstallRoot
@@ -1276,9 +1276,9 @@ func buildUKI(installRoot, kernelPath, initrdPath, cmdlineFile, outputPath strin
 			log.Errorf("non-immutable: Failed to build UKI: %v failing command %s", err, cmd)
 			err = fmt.Errorf("failed to build UKI: %w", err)
 		} else {
-		       log.Infof("non-immutable: Successfully built UKI: %v  command %s", err, cmd)
-                }
-		
+			log.Infof("non-immutable: Successfully built UKI: %v  command %s", err, cmd)
+		}
+
 	}
 	return err
 }

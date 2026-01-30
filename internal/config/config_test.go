@@ -3776,6 +3776,7 @@ func TestUnifiedRepoConfig(t *testing.T) {
 		})
 	}
 }
+
 // TestGetAdditionalFileInfo tests the GetAdditionalFileInfo method
 func TestGetAdditionalFileInfo(t *testing.T) {
 	// Create temporary test files
@@ -3909,7 +3910,7 @@ func TestWasProvided(t *testing.T) {
 // TestGetConfigPaths tests that GetConfigPaths returns expected config locations
 func TestGetConfigPaths(t *testing.T) {
 	paths := GetConfigPaths()
-	
+
 	if len(paths) == 0 {
 		t.Error("GetConfigPaths should return at least one path")
 	}
@@ -3961,9 +3962,9 @@ func TestFindConfigFile(t *testing.T) {
 	tmpDir := t.TempDir()
 	originalDir, _ := os.Getwd()
 	defer os.Chdir(originalDir)
-	
+
 	os.Chdir(tmpDir)
-	
+
 	// Test when no config file exists
 	result := FindConfigFile()
 	if result != "" {
@@ -4088,7 +4089,7 @@ func TestEnsureTempDir(t *testing.T) {
 	if dir == "" {
 		t.Error("EnsureTempDir should return non-empty path")
 	}
-	
+
 	// Verify the directory was created
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		t.Error("EnsureTempDir should create the directory")
