@@ -310,6 +310,10 @@ func TestInstallImageBoot_GrubEfiMode(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(tmpDir, "etc", "default"), 0755); err != nil {
 		t.Fatalf("Failed to create etc directories: %v", err)
 	}
+	// Create mock kernel file for initramfs update
+	if err := os.WriteFile(filepath.Join(tmpDir, "boot", "vmlinuz-5.15.0-test"), []byte(""), 0644); err != nil {
+		t.Fatalf("Failed to create mock kernel file: %v", err)
+	}
 
 	template := &config.ImageTemplate{
 		Image: config.ImageInfo{
@@ -337,11 +341,14 @@ func TestInstallImageBoot_GrubEfiMode(t *testing.T) {
 		{Pattern: "blkid.*UUID", Output: "UUID=test-uuid\n", Error: nil},
 		{Pattern: "blkid.*PARTUUID", Output: "PARTUUID=test-partuuid\n", Error: nil},
 		{Pattern: "command -v grub2-mkconfig", Output: "/usr/sbin/grub2-mkconfig", Error: nil},
+		{Pattern: "command -v update-initramfs", Output: "/usr/sbin/update-initramfs", Error: nil},
 		{Pattern: "mkdir", Output: "", Error: nil},
 		{Pattern: "cp", Output: "", Error: nil},
 		{Pattern: "sed", Output: "", Error: nil},
 		{Pattern: "chmod", Output: "", Error: nil},
 		{Pattern: "chmod", Output: "", Error: nil},
+		{Pattern: "echo.*initramfs-tools/modules", Output: "", Error: nil},
+		{Pattern: "update-initramfs", Output: "", Error: nil},
 		{Pattern: "grub-install", Output: "", Error: nil},
 		{Pattern: "grub2-mkconfig", Output: "", Error: nil},
 	}
@@ -467,6 +474,10 @@ func TestInstallImageBoot_SeparateBootPartition(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(tmpDir, "etc", "default"), 0755); err != nil {
 		t.Fatalf("Failed to create etc directories: %v", err)
 	}
+	// Create mock kernel file for initramfs update
+	if err := os.WriteFile(filepath.Join(tmpDir, "boot", "vmlinuz-5.15.0-test"), []byte(""), 0644); err != nil {
+		t.Fatalf("Failed to create mock kernel file: %v", err)
+	}
 
 	template := &config.ImageTemplate{
 		Image: config.ImageInfo{
@@ -495,11 +506,14 @@ func TestInstallImageBoot_SeparateBootPartition(t *testing.T) {
 		{Pattern: "blkid.*UUID", Output: "UUID=boot-uuid\n", Error: nil},
 		{Pattern: "blkid.*PARTUUID", Output: "PARTUUID=root-partuuid\n", Error: nil},
 		{Pattern: "command -v grub2-mkconfig", Output: "/usr/sbin/grub2-mkconfig", Error: nil},
+		{Pattern: "command -v update-initramfs", Output: "/usr/sbin/update-initramfs", Error: nil},
 		{Pattern: "mkdir", Output: "", Error: nil},
 		{Pattern: "cp", Output: "", Error: nil},
 		{Pattern: "sed", Output: "", Error: nil},
 		{Pattern: "chmod", Output: "", Error: nil},
 		{Pattern: "chmod", Output: "", Error: nil},
+		{Pattern: "echo.*initramfs-tools/modules", Output: "", Error: nil},
+		{Pattern: "update-initramfs", Output: "", Error: nil},
 		{Pattern: "grub-install", Output: "", Error: nil},
 		{Pattern: "grub2-mkconfig", Output: "", Error: nil},
 	}
