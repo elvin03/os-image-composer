@@ -751,7 +751,7 @@ func TestElxrPreProcessWithMockEnv(t *testing.T) {
 	}
 
 	template := createTestImageTemplate()
-	
+
 	err := elxr.PreProcess(template)
 	if err == nil {
 		t.Log("PreProcess succeeded unexpectedly")
@@ -779,7 +779,7 @@ func TestElxrDownloadImagePkgsWithMockEnv(t *testing.T) {
 
 	template := createTestImageTemplate()
 	template.DotFilePath = ""
-	
+
 	err := elxr.downloadImagePkgs(template)
 	if err == nil {
 		t.Log("downloadImagePkgs succeeded unexpectedly")
@@ -797,12 +797,12 @@ func TestElxrDownloadImagePkgsNoRepos(t *testing.T) {
 	}
 
 	template := createTestImageTemplate()
-	
+
 	err := elxr.downloadImagePkgs(template)
 	if err == nil {
 		t.Error("Expected error when no repositories configured")
 	}
-	
+
 	expectedError := "no repository configurations available"
 	if !strings.Contains(err.Error(), expectedError) {
 		t.Errorf("Expected error containing '%s', got: %v", expectedError, err)
@@ -817,7 +817,7 @@ func TestElxrBuildRawImageWithMock(t *testing.T) {
 
 	template := createTestImageTemplate()
 	template.Target.ImageType = "raw"
-	
+
 	err := elxr.buildRawImage(template)
 	if err == nil {
 		t.Error("Expected error with mock environment")
@@ -837,7 +837,7 @@ func TestElxrBuildInitrdImageWithMock(t *testing.T) {
 
 	template := createTestImageTemplate()
 	template.Target.ImageType = "img"
-	
+
 	err := elxr.buildInitrdImage(template)
 	if err == nil {
 		t.Error("Expected error with mock environment")
@@ -857,7 +857,7 @@ func TestElxrBuildIsoImageWithMock(t *testing.T) {
 
 	template := createTestImageTemplate()
 	template.Target.ImageType = "iso"
-	
+
 	err := elxr.buildIsoImage(template)
 	if err == nil {
 		t.Error("Expected error with mock environment")
@@ -876,7 +876,7 @@ func TestElxrPostProcessSuccess(t *testing.T) {
 	}
 
 	template := createTestImageTemplate()
-	
+
 	// Test with no input error - PostProcess should only return cleanup errors
 	err := elxr.PostProcess(template, nil)
 	if err != nil {
@@ -888,10 +888,10 @@ func TestElxrPostProcessSuccess(t *testing.T) {
 // TestElxrInstallHostDependency tests installHostDependency function
 func TestElxrInstallHostDependency(t *testing.T) {
 	elxr := &eLxr{}
-	
+
 	// Call installHostDependency
 	err := elxr.installHostDependency()
-	
+
 	// In test environment, this may succeed or fail based on host OS
 	if err != nil {
 		// Verify error message is reasonable
@@ -908,12 +908,12 @@ func TestElxrInstallHostDependency(t *testing.T) {
 func TestElxrInstallHostDependencyMapping(t *testing.T) {
 	// Test the expected dependencies mapping
 	expectedDeps := map[string]string{
-		"mmdebstrap":   "mmdebstrap",
-		"mkfs.fat":     "dosfstools",
-		"xorriso":      "xorriso",
-		"sbsign":       "sbsigntool",
-		"ukify":        "systemd-ukify",
-		"veritysetup":  "cryptsetup",
+		"mmdebstrap":  "mmdebstrap",
+		"mkfs.fat":    "dosfstools",
+		"xorriso":     "xorriso",
+		"sbsign":      "sbsigntool",
+		"ukify":       "systemd-ukify",
+		"veritysetup": "cryptsetup",
 	}
 
 	t.Logf("Expected host dependencies for eLxr provider: %v", expectedDeps)
@@ -996,32 +996,32 @@ func TestLoadRepoConfigInvalidArch(t *testing.T) {
 func TestDisplayImageArtifacts(t *testing.T) {
 	// Create a temporary directory for testing
 	tempDir := t.TempDir()
-	
+
 	// Test with empty directory
 	displayImageArtifacts(tempDir, "TEST")
 	t.Log("displayImageArtifacts called successfully with empty directory")
-	
+
 	// Test with different image types
 	displayImageArtifacts(tempDir, "RAW")
 	displayImageArtifacts(tempDir, "ISO")
 	displayImageArtifacts(tempDir, "IMG")
-	
+
 	t.Log("displayImageArtifacts tested with multiple image types")
 }
 
 // TestRegisterSuccess tests successful Register call
 func TestRegisterSuccess(t *testing.T) {
 	// Test Register function with valid parameters
-	
+
 	// Test that Register doesn't panic
 	defer func() {
 		if r := recover(); r != nil {
 			t.Errorf("Register panicked: %v", r)
 		}
 	}()
-	
+
 	err := Register("wind-river-elxr", "elxr12", "amd64")
-	
+
 	// We expect error in test environment, but it should be controlled
 	if err != nil {
 		t.Logf("Register returned expected error in test environment: %v", err)
@@ -1094,7 +1094,7 @@ func TestBuildImageEdgeCases(t *testing.T) {
 	template := createTestImageTemplate()
 	template.Image.Name = ""
 	template.Target.ImageType = "raw"
-	
+
 	err := elxr.BuildImage(template)
 	if err == nil {
 		t.Log("BuildImage handled empty name gracefully")
@@ -1111,7 +1111,7 @@ func TestPreProcessErrorPropagation(t *testing.T) {
 	}
 
 	template := createTestImageTemplate()
-	
+
 	err := elxr.PreProcess(template)
 	if err != nil {
 		// Verify error message contains context
@@ -1236,14 +1236,14 @@ func TestLoadRepoConfigMultipleRepos(t *testing.T) {
 	}
 
 	t.Logf("loadRepoConfig returned %d repositories", len(cfgs))
-	
+
 	for i, cfg := range cfgs {
 		t.Logf("Repository %d: name=%s, arch=%s", i, cfg.Name, cfg.Arch)
-		
+
 		if cfg.Name == "" {
 			t.Errorf("Repository %d has empty name", i)
 		}
-		
+
 		if cfg.Arch == "" {
 			t.Errorf("Repository %d has empty arch", i)
 		}

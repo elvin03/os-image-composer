@@ -3961,9 +3961,16 @@ func TestFindConfigFile(t *testing.T) {
 	// Create a temporary config file in current directory
 	tmpDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
+	defer func() {
+		if err := os.Chdir(originalDir); err != nil {
+			t.Logf("Failed to change back to original directory: %v", err)
+		}
+	}()
 
-	os.Chdir(tmpDir)
+	err := os.Chdir(tmpDir)
+	if err != nil {
+		t.Fatalf("Failed to change to temp dir: %v", err)
+	}
 
 	// Test when no config file exists
 	result := FindConfigFile()
