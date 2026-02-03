@@ -2,7 +2,6 @@
 set -euo pipefail
 
 # dep-analyzer.sh — analyze and slice DOT dependency graphs
-# Preserves existing semantic colors from os-image-composer
 
 usage() {
   cat <<'EOF'
@@ -27,11 +26,6 @@ Options:
   -h, --help            Show this help
 
 Notes:
-  - Preserves semantic colors from os-image-composer DOT output:
-    * Yellow (#fff4d6) = Essential packages
-    * Green (#d4efdf) = System packages (user-specified)
-    * Blue (#d6eaf8) = Kernel packages
-    * Orange (#fdebd0) = Bootloader packages
   - "depth" means shortest-path hops from root following edge direction
   - Reverse mode is useful for "who depends on X" analysis
 EOF
@@ -200,8 +194,9 @@ N {
 }
 ' "${INPUT}" > "${tmp_dot}"
 
-# Check if output has the root node (for depth 0, there may be no edges)
-if ! grep -qE "\"?${ROOT}\"?\s*\[" "${tmp_dot}" && ! grep -qE "^\s*${ROOT}\s*\[" "${tmp_dot}"; then
+# Check if output has the root node
+# Match node declarations ("node"; or "node" [attrs];) or edge statements ("node" -> ...)
+if ! grep -qE "(\"${ROOT}\"|^\s*${ROOT})(\s*\[|\s*;|\s*->|\s*--)" "${tmp_dot}"; then
   echo "Warning: Root node '${ROOT}' not found in output."
   echo "Tip: Use 'grep \"${ROOT}\" ${INPUT}' to verify the node name."
 fi
