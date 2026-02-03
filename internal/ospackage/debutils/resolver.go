@@ -61,7 +61,7 @@ func GenerateDot(pkgs []ospackage.PackageInfo, file string, pkgSources map[strin
 			if depName == "" {
 				continue
 			}
-			edgeKey := fmt.Sprintf("%s -> %s", pkg.Name, depName)
+			edgeKey := pkg.Name + "|" + depName
 			if edgesWritten[edgeKey] {
 				continue
 			}
