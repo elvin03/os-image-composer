@@ -21,6 +21,11 @@ import (
 
 // extractBaseRequirement takes a potentially complex requirement string
 // and returns only the base package/capability name.
+// Examples:
+//   - "libc.so.6(GLIBC_2.38)(64bit)" -> "libc.so.6"
+//   - "libsemanage.so.2(LIBSEMANAGE_1.0)(64bit)" -> "libsemanage.so.2"
+//   - "(coreutils or busybox)" -> "coreutils"
+//   - "filesystem >= 3.0" -> "filesystem"
 func extractBaseRequirement(req string) string {
 	if strings.HasPrefix(req, "(") && strings.Contains(req, " ") {
 		trimmed := strings.TrimPrefix(req, "(")
@@ -34,7 +39,18 @@ func extractBaseRequirement(req string) string {
 		return ""
 	}
 	base := finalParts[0]
-	return strings.TrimSuffix(base, "()(64bit)")
+
+	// Remove all parenthesized suffixes like (GLIBC_2.38)(64bit), (LIBSEMANAGE_1.0)(64bit), etc.
+	// Keep removing until no more parentheses at the end
+	for {
+		idx := strings.Index(base, "(")
+		if idx == -1 {
+			break
+		}
+		base = base[:idx]
+	}
+
+	return base
 }
 
 func GenerateDot(pkgs []ospackage.PackageInfo, file string, pkgSources map[string]config.PackageSource) error {
@@ -67,6 +83,9 @@ func GenerateDot(pkgs []ospackage.PackageInfo, file string, pkgSources map[strin
 			continue
 		}
 		// Extract clean package name for display (e.g., "libgcrypt" instead of "libgcrypt-1.10.3-1.azl3.x86_64.rpm")
+		// Note: Multiple package versions (e.g., glibc-2.38 and glibc-2.35) will both produce "glibc"
+		// This causes duplicate node declarations in the DOT file, which is valid - GraphViz merges them.
+		// For visualization purposes, we only care about package relationships, not specific versions.
 		cleanName := extractBasePackageNameFromFile(pkg.Name)
 		if _, err := fmt.Fprintf(writer, "  \"%s\";\n", cleanName); err != nil {
 			return fmt.Errorf("writing DOT node for %s: %w", cleanName, err)
