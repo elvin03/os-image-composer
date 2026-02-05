@@ -75,8 +75,8 @@ func GenerateDot(pkgs []ospackage.PackageInfo, file string, pkgSources map[strin
 			if dep == "" {
 				continue
 			}
-			// Extract clean dependency name for edges
-			cleanDep := extractBasePackageNameFromFile(dep)
+			// Extract clean dependency name for edges (handles capabilities and package requirements)
+			cleanDep := extractBaseRequirement(dep)
 			edgeKey := cleanName + "|" + cleanDep
 			if edgesWritten[edgeKey] {
 				continue
