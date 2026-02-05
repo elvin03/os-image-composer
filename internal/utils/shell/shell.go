@@ -498,7 +498,7 @@ func (d *DefaultExecutor) ExecCmd(cmdStr string, sudo bool, chrootPath string, e
 		if outputStr != "" {
 			// return outputStr, fmt.Errorf("failed to exec %s: output %s, err %w", fullCmdStr, outputStr, err)
 			// Do not include the full command string in the error to avoid leaking sensitive data.
-			return outputStr, fmt.Errorf("failed to execute command: %w", err)
+			return outputStr, fmt.Errorf("failed to execute command with output: %w", err)
 		} else {
 			// return outputStr, fmt.Errorf("failed to exec %s: %w", fullCmdStr, err)
 			// Do not include the full command string in the error to avoid leaking sensitive data.
