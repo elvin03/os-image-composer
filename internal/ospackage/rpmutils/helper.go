@@ -210,6 +210,7 @@ func compareVersions(v1, v2 string) int {
 // extractBasePackageNameFromFile extracts the base package name from a full package filename
 // e.g., "curl-8.8.0-2.azl3.x86_64.rpm" -> "curl"
 // e.g., "curl-devel-8.8.0-1.azl3.x86_64.rpm" -> "curl-devel"
+// e.g., "libpcre2-8-0-10.42-3.azl3.x86_64.rpm" -> "libpcre2-8-0"
 func extractBasePackageNameFromFile(fullName string) string {
 	// Remove .rpm suffix if present
 	name := strings.TrimSuffix(fullName, ".rpm")
@@ -220,22 +221,39 @@ func extractBasePackageNameFromFile(fullName string) string {
 		return name
 	}
 
-	// Find the first part that looks like a version (starts with digit)
-	for i := 1; i < len(parts); i++ {
-		if len(parts[i]) > 0 && (parts[i][0] >= '0' && parts[i][0] <= '9') {
-			// get the name
-			maybe_name := strings.Join(parts[:i], "-")
-			// check if version is part of the name
-			// full name contains version, if package name has version,
-			// it will be repeated in the full name
-			for j := i + 1; j < len(parts); j++ {
-				if len(parts[j]) > 0 && strings.Contains(parts[j], parts[i]) {
-					maybe_name = strings.Join(parts[:j], "-")
-					break
+	// First, try to find dist/arch markers (.azl3, .el9, .fc39, etc.) and work backwards
+	// This handles the <name>-<version>-<release>.<dist>.<arch> format
+	for i := len(parts) - 1; i >= 0; i-- {
+		part := parts[i]
+		// Check if this part contains a dist marker (azl3, el9, fc39, etc.) or arch (x86_64, aarch64, noarch)
+		if strings.Contains(part, ".azl3") || strings.Contains(part, ".el") ||
+			strings.Contains(part, ".fc") || strings.Contains(part, "x86_64") ||
+			strings.Contains(part, "aarch64") || strings.Contains(part, "noarch") ||
+			strings.Contains(part, "i686") {
+			// This is the release part. Name ends before the previous numeric part (version)
+			// Work backwards to find where version starts
+			for j := i - 1; j >= 1; j-- {
+				if len(parts[j]) > 0 && (parts[j][0] >= '0' && parts[j][0] <= '9') {
+					// This is likely the start of the version
+					return strings.Join(parts[:j], "-")
 				}
 			}
-			// return name or name-version
-			return maybe_name
+		}
+	}
+
+	// Fallback: Find the first part that looks like a version (starts with digit and contains a dot)
+	// This handles simple cases where there's no clear dist marker
+	for i := 1; i < len(parts); i++ {
+		if len(parts[i]) > 0 && (parts[i][0] >= '0' && parts[i][0] <= '9') && strings.Contains(parts[i], ".") {
+			// This looks like a version (e.g., "8.8.0")
+			return strings.Join(parts[:i], "-")
+		}
+	}
+
+	// Second fallback: Find first numeric part
+	for i := 1; i < len(parts); i++ {
+		if len(parts[i]) > 0 && (parts[i][0] >= '0' && parts[i][0] <= '9') {
+			return strings.Join(parts[:i], "-")
 		}
 	}
 
