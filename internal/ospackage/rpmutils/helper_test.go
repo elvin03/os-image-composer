@@ -477,6 +477,13 @@ func TestResolveTopPackageConflicts(t *testing.T) {
 			dist:        "",
 			expectFound: false,
 		},
+		{
+			name:        "Multiple versions picks highest",
+			want:        "acct",
+			dist:        "",
+			expectedPkg: "acct",
+			expectFound: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -489,6 +496,12 @@ func TestResolveTopPackageConflicts(t *testing.T) {
 			if tt.expectFound && pkg.Name != tt.expectedPkg {
 				t.Logf("ResolveTopPackageConflicts() found pkg: Name=%q, Version=%q", pkg.Name, pkg.Version)
 				t.Errorf("ResolveTopPackageConflicts() pkg.Name = %q, want %q", pkg.Name, tt.expectedPkg)
+			}
+			// For "Exact match with dist filter", verify dist filtering selects the right version
+			if tt.name == "Exact match with dist filter" && found {
+				if !strings.Contains(pkg.Version, "azl3") {
+					t.Errorf("ResolveTopPackageConflicts() with dist=azl3 should pick azl3 version, got %q", pkg.Version)
+				}
 			}
 		})
 	}

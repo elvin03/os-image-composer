@@ -272,14 +272,17 @@ func findAllCandidates(parent ospackage.PackageInfo, depName string, all []ospac
 // ResolvePackage finds the best matching package for a given package name
 func ResolveTopPackageConflicts(want string, all []ospackage.PackageInfo) (ospackage.PackageInfo, bool) {
 	var candidates []ospackage.PackageInfo
+	exactMatch := false
 	for _, pi := range all {
 		// 1) exact name match (e.g., "acct")
 		if pi.Name == want {
 			candidates = append(candidates, pi)
-			break
+			exactMatch = true
+			continue
 		}
 		// 2) prefix match for version-specific requests (e.g., want = "openvino-2025.3.0")
-		if strings.HasPrefix(want, pi.Name+"-") && len(want) > len(pi.Name)+1 {
+		//    Only try prefix match if we haven't found any exact matches
+		if !exactMatch && strings.HasPrefix(want, pi.Name+"-") && len(want) > len(pi.Name)+1 {
 			// Extract string after package name and compare with pi.Version
 			verStr := want[len(pi.Name)+1:]
 			if strings.Contains(pi.Version, verStr) {
@@ -293,7 +296,7 @@ func ResolveTopPackageConflicts(want string, all []ospackage.PackageInfo) (ospac
 		return ospackage.PackageInfo{}, false
 	}
 
-	// If we got an exact match in step (1), it's the only candidate
+	// Single candidate - return directly
 	if len(candidates) == 1 {
 		return candidates[0], true
 	}
