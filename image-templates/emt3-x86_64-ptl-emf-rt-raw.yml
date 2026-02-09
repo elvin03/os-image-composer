@@ -27,6 +27,11 @@ target:
   arch: x86_64 # Target OS architecture
   imageType: raw # Image type, valid value: [raw, iso].
 
+packageRepositories:
+  - codename: "emtNext"
+    url: "https://files-rs.edgeorchestration.intel.com/files-edge-orch/microvisor/rpms/next/base"
+    pkey: "https://raw.githubusercontent.com/open-edge-platform/edge-microvisor-toolkit/refs/heads/3.0/SPECS/edge-repos/INTEL-RPM-GPG-KEY"
+
 disk:
   name: edge-rt # 1:1 mapping to the systemConfigs name
   artifacts:
@@ -88,6 +93,6 @@ systemConfig:
   # Kernel Configuration
   kernel:
     version: "6.12"
-    cmdline: "root=/dev/mapper/rootfs_verity console=ttyS0,115200 console=tty0 loglevel=7 sysctl.vm.overcommit_memory=1 sysctl.kernel.panic=10 sysctl.kernel.panic_on_oops=1 sysctl.fs.inotify.max_user_instances=8192 rd.parallel=1 rd.shell=0 rd.timeout=200 rd.emergency=reboot i915.force_probe=*"
+    cmdline: "root=/dev/mapper/rootfs_verity console=ttyS0,115200 console=tty0 loglevel=7 sysctl.vm.overcommit_memory=1 sysctl.kernel.panic=10 sysctl.kernel.panic_on_oops=1 sysctl.fs.inotify.max_user_instances=8192 rd.parallel=1 rd.shell=0 rd.timeout=200 rd.emergency=reboot"
     packages:
       - kernel-rt-drivers-gpu
