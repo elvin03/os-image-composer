@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -21,6 +20,11 @@ import (
 
 // extractBaseRequirement takes a potentially complex requirement string
 // and returns only the base package/capability name.
+// Examples:
+//   - "libc.so.6(GLIBC_2.38)(64bit)" -> "libc.so.6"
+//   - "libsemanage.so.2(LIBSEMANAGE_1.0)(64bit)" -> "libsemanage.so.2"
+//   - "(coreutils or busybox)" -> "coreutils"
+//   - "filesystem >= 3.0" -> "filesystem"
 func extractBaseRequirement(req string) string {
 	if strings.HasPrefix(req, "(") && strings.Contains(req, " ") {
 		trimmed := strings.TrimPrefix(req, "(")
@@ -34,7 +38,18 @@ func extractBaseRequirement(req string) string {
 		return ""
 	}
 	base := finalParts[0]
-	return strings.TrimSuffix(base, "()(64bit)")
+
+	// Remove all parenthesized suffixes like (GLIBC_2.38)(64bit), (LIBSEMANAGE_1.0)(64bit), etc.
+	// Keep removing until no more parentheses at the end
+	for {
+		idx := strings.Index(base, "(")
+		if idx == -1 {
+			break
+		}
+		base = base[:idx]
+	}
+
+	return base
 }
 
 func GenerateDot(pkgs []ospackage.PackageInfo, file string, pkgSources map[string]config.PackageSource) error {
@@ -66,6 +81,8 @@ func GenerateDot(pkgs []ospackage.PackageInfo, file string, pkgSources map[strin
 		if pkg.Name == "" {
 			continue
 		}
+		// pkg.Name already contains the clean package name from XML <name> element
+		// (e.g., "libgcrypt" not "libgcrypt-1.10.3-1.azl3.x86_64.rpm")
 		if _, err := fmt.Fprintf(writer, "  \"%s\";\n", pkg.Name); err != nil {
 			return fmt.Errorf("writing DOT node for %s: %w", pkg.Name, err)
 		}
@@ -73,12 +90,14 @@ func GenerateDot(pkgs []ospackage.PackageInfo, file string, pkgSources map[strin
 			if dep == "" {
 				continue
 			}
-			edgeKey := pkg.Name + "|" + dep
+			// Extract clean dependency name for edges (handles capabilities and package requirements)
+			cleanDep := extractBaseRequirement(dep)
+			edgeKey := pkg.Name + "|" + cleanDep
 			if edgesWritten[edgeKey] {
 				continue
 			}
-			if _, err := fmt.Fprintf(writer, "  \"%s\" -> \"%s\";\n", pkg.Name, dep); err != nil {
-				return fmt.Errorf("writing DOT edge %s->%s: %w", pkg.Name, dep, err)
+			if _, err := fmt.Fprintf(writer, "  \"%s\" -> \"%s\";\n", pkg.Name, cleanDep); err != nil {
+				return fmt.Errorf("writing DOT edge %s->%s: %w", pkg.Name, cleanDep, err)
 			}
 			edgesWritten[edgeKey] = true
 		}
@@ -181,11 +200,10 @@ func ParseRepositoryMetadata(baseURL, gzHref string) ([]ospackage.PackageInfo, e
 				}
 
 			case "location":
-				// read the href and build full URL + infer Name (filename)
+				// read the href and build full URL (but don't overwrite Name - it's already set from <name> element)
 				for _, a := range elem.Attr {
 					if a.Name.Local == "href" {
 						curInfo.URL = strings.TrimRight(baseURL, "/") + "/" + strings.TrimLeft(a.Value, "/")
-						curInfo.Name = path.Base(a.Value)
 						break
 					}
 				}
@@ -609,12 +627,13 @@ func ResolveDependencies(requested []ospackage.PackageInfo, all []ospackage.Pack
 }
 
 // findMatchingKeyInNeededSet checks if any key in neededSet contains depName as a substring,
-// and returns the first matching key whose base package name equals depName.
+// and returns the first matching key whose package name equals depName.
 func findMatchingKeyInNeededSet(neededSet map[string]struct{}, depName string) (string, bool) {
 	for k := range neededSet {
 		if strings.Contains(k, depName) {
-			fileName := extractBasePackageNameFromFile(k)
-			if fileName == depName {
+			// k format is "name=version", extract the name part
+			parts := strings.Split(k, "=")
+			if len(parts) > 0 && parts[0] == depName {
 				return k, true
 			}
 		}
