@@ -166,28 +166,23 @@ jobs:
           const serverUrl = process.env.SERVER_URL || 'https://github.com';
           const language = process.env.MATRIX_LANGUAGE || 'unknown';
           
-          // Sanitize inputs to prevent injection
-          const sanitize = (str) => String(str).replace(/[<>&"']/g, (char) => {
-            const map = { '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#x27;' };
-            return map[char];
-          });
           
-          const title = `🚨 Security Issues Detected - ${sanitize(commitMessage)}`;
+          const title = `🚨 Security Issues Detected - ${commitMessage}`;
           const body = `## Security Alert
           
-          CodeQL analysis has detected **${sanitize(findingsCount)}** security issue(s) in the codebase.
+          CodeQL analysis has detected **${findingsCount}** security issue(s) in the codebase.
           
           ### Details:
-          - **Repository**: ${sanitize(repository)}
-          - **Branch**: ${sanitize(branchName)}
-          - **Commit**: ${sanitize(commitSha)}
-          - **Workflow Run**: [${sanitize(runNumber)}](${sanitize(serverUrl)}/${sanitize(repository)}/actions/runs/${sanitize(runId)})
-          - **Language**: ${sanitize(language)}
+          - **Repository**: ${repository}
+          - **Branch**: ${branchName}
+          - **Commit**: ${commitSha}
+          - **Workflow Run**: [${runNumber}](${serverUrl}/${repository}/actions/runs/${runId})
+          - **Language**: ${language}
           
           ### Action Required:
           Please review the security findings immediately:
-          - [View Security Tab](${sanitize(serverUrl)}/${sanitize(repository)}/security/code-scanning)
-          - [View Workflow Run](${sanitize(serverUrl)}/${sanitize(repository)}/actions/runs/${sanitize(runId)})
+          - [View Security Tab](${serverUrl}/${repository}/security/code-scanning)
+          - [View Workflow Run](${serverUrl}/${repository}/actions/runs/${runId})
           
           ### Assignees:
           @elvin03 please review and address these security issues.
