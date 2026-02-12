@@ -30,6 +30,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.inputs.ref || github.ref }}
           persist-credentials: false
 
       - name: Set up Docker Buildx
