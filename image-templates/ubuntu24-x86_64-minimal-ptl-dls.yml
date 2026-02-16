@@ -1,5 +1,5 @@
 image:
-  name: minimal-desktop-ubuntu-ptl
+  name: minimal-desktop-ubuntu-ptl-dls
   version: "24.04"
 
 target:
@@ -11,7 +11,7 @@ target:
 # Disk layout and output artifact definition
 disk:
   # Human friendly name logged by builders
-  name: minimal-desktop-ubuntu-ptl
+  name: minimal-desktop-ubuntu-ptl-dls
   artifacts:
     # Request conversion to raw
     - type: raw
