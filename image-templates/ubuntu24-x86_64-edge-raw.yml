@@ -45,7 +45,7 @@ systemConfig:
   description: edge ubuntu image with immutable rootfs
 
   immutability:
-    enabled: false # default is true
+    enabled: true # default is true
     # To enable Secure Boot, provide the actual file paths for your environment below and uncomment the relevant lines.
     # secureBootDBKey: "<SECURE_BOOT_DB_KEY_PATH>"
     # secureBootDBCrt: "<SECURE_BOOT_DB_CRT_PATH>"
@@ -60,11 +60,6 @@ systemConfig:
     - openssh-server
     - systemd-resolved
     - systemd-timesyncd
-
-  users:
-    - name: user
-      password: user1234
-      groups: ["sudo"]
 
   kernel:
     version: "6.14"
