@@ -36,7 +36,7 @@ func shouldRetryHTTPStatus(statusCode int) bool {
 	}
 }
 
-func downloadWithRetry(client *http.Client, url, destPath string) error {
+func downloadWithRetry(client *http.Client, url, destPath string, threadcontext int) error {
 	log := logger.Logger()
 
 	var lastErr error
@@ -66,9 +66,14 @@ func downloadWithRetry(client *http.Client, url, destPath string) error {
 				}
 				defer out.Close()
 
-				if _, copyErr := io.Copy(out, resp.Body); copyErr != nil {
+				writtenBytes, copyErr := io.Copy(out, resp.Body)
+				if copyErr != nil {
 					lastErr = copyErr
 					return
+				}
+				// writtenBytes zero means empty Body, so retry
+				if writtenBytes == 0 {
+					lastErr = fmt.Errorf("empty response body") 
 				}
 
 				lastErr = nil
@@ -89,7 +94,7 @@ func downloadWithRetry(client *http.Client, url, destPath string) error {
 
 		log.Warnf("download attempt %d/%d failed for %s: %v; retrying in %s", attempt, maxDownloadAttempts, url, lastErr, backoff)
 		time.Sleep(backoff)
-		backoff *= 2
+		backoff *= time.Duration(2 * (threadcontext +1))
 	}
 
 	return fmt.Errorf("download failed after %d attempts: %w", maxDownloadAttempts, lastErr)
@@ -157,7 +162,7 @@ func FetchPackages(urls []string, destDir string, workers int) error {
 					log.Warnf("re-downloading zero-size %s", name)
 				}
 				client := network.GetSecureHTTPClient()
-				err := downloadWithRetry(client, url, destPath)
+				err := downloadWithRetry(client, url, destPath, i)
 
 				if err != nil {
 					log.Errorf("downloading %s failed: %v", url, err)
